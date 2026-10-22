@@ -1,0 +1,574 @@
+{
+ "soldier_army": {
+  "uniform": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6e4a30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "boot": {
+   "color": "#1b1712",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "webbing": {
+   "color": "#3d4128",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "hair": {
+   "color": "#0f0d0b",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "helmet": {
+   "color": "#3f4a26",
+   "roughness": 0.8,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "gun_metal": {
+   "color": "#25272a",
+   "roughness": 0.45,
+   "metallic": 0.8,
+   "texture": null
+  },
+  "gun_wood": {
+   "color": "#6b3d1f",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "soldier_ltte": {
+  "uniform": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_tiger_stripe"
+  },
+  "skin": {
+   "color": "#5e3e28",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "boot": {
+   "color": "#1b1712",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "webbing": {
+   "color": "#2b2a1f",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "hair": {
+   "color": "#0f0d0b",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "cap": {
+   "color": "#4b4a2a",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "gun_metal": {
+   "color": "#25272a",
+   "roughness": 0.45,
+   "metallic": 0.8,
+   "texture": null
+  },
+  "gun_wood": {
+   "color": "#6b3d1f",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "civilian": {
+  "shirt": {
+   "color": "#d9d4c7",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "sarong": {
+   "color": "#3b5a7a",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_sarong"
+  },
+  "skin": {
+   "color": "#7a5236",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "hair": {
+   "color": "#0f0d0b",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "buffel": {
+  "vehicle_camo": {
+   "color": "#ffffff",
+   "roughness": 0.8,
+   "metallic": 0.0,
+   "texture": "tex_vehicle_camo"
+  },
+  "tyre": {
+   "color": "#151515",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "steel": {
+   "color": "#2c2f2a",
+   "roughness": 0.5,
+   "metallic": 0.6,
+   "texture": null
+  },
+  "glass": {
+   "color": "#1e2b30",
+   "roughness": 0.2,
+   "metallic": 0.3,
+   "texture": null
+  }
+ },
+ "seatiger_boat": {
+  "fibreglass": {
+   "color": "#3c4146",
+   "roughness": 0.5,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "deck": {
+   "color": "#2a2d30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "engine": {
+   "color": "#141414",
+   "roughness": 0.4,
+   "metallic": 0.5,
+   "texture": null
+  }
+ },
+ "bunker": {
+  "sandbag": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_sandbag"
+  },
+  "log": {
+   "color": "#4a3520",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "dark": {
+   "color": "#111111",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "earth_bund": {
+  "earth": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_earth"
+  },
+  "bund_grass": {
+   "color": "#5b6b2e",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "sandbag2": {
+   "color": "#9a8a64",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "house": {
+  "plaster": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_plaster"
+  },
+  "roof_tile": {
+   "color": "#ffffff",
+   "roughness": 0.8,
+   "metallic": 0.0,
+   "texture": "tex_roof"
+  },
+  "opening": {
+   "color": "#1a1612",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "wood": {
+   "color": "#5c3e22",
+   "roughness": 0.85,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "floor": {
+   "color": "#8f8676",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "house_ruined": {
+  "plaster": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_plaster"
+  },
+  "roof_tile": {
+   "color": "#ffffff",
+   "roughness": 0.8,
+   "metallic": 0.0,
+   "texture": "tex_roof"
+  },
+  "opening": {
+   "color": "#1a1612",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "wood": {
+   "color": "#5c3e22",
+   "roughness": 0.85,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "floor": {
+   "color": "#8f8676",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "water_tower": {
+  "concrete": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_concrete"
+  },
+  "rebar": {
+   "color": "#4a3b30",
+   "roughness": 0.6,
+   "metallic": 0.5,
+   "texture": null
+  }
+ },
+ "sluice_gate": {
+  "concrete": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_concrete2"
+  },
+  "gate_steel": {
+   "color": "#3d4a52",
+   "roughness": 0.5,
+   "metallic": 0.7,
+   "texture": null
+  },
+  "rust": {
+   "color": "#6a3a1e",
+   "roughness": 0.8,
+   "metallic": 0.3,
+   "texture": null
+  }
+ },
+ "palm_coconut": {
+  "palm_bark": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_bark"
+  },
+  "palm_leaf": {
+   "color": "#4f7a28",
+   "roughness": 0.8,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "coconut": {
+   "color": "#5d6a1e",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "palm_palmyrah": {
+  "palmyrah_bark": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_bark2"
+  },
+  "palmyrah_leaf": {
+   "color": "#6a8a34",
+   "roughness": 0.85,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "dry_leaf": {
+   "color": "#7a6a3a",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "tree_jungle": {
+  "tree_bark": {
+   "color": "#4d3a28",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "tree_leaf": {
+   "color": "#3b5e22",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "tree_leaf2": {
+   "color": "#4c6f2a",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "bush": {
+  "bush_leaf": {
+   "color": "#47662a",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "bush_leaf2": {
+   "color": "#5b7a30",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "rock_outcrop": {
+  "granite": {
+   "color": "#ffffff",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": "tex_granite"
+  }
+ },
+ "rock_small": {
+  "granite": {
+   "color": "#ffffff",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": "tex_granite"
+  }
+ },
+ "supplies": {
+  "crate_wood": {
+   "color": "#ffffff",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": "tex_crate"
+  },
+  "drum": {
+   "color": "#31452a",
+   "roughness": 0.6,
+   "metallic": 0.4,
+   "texture": null
+  }
+ },
+ "sandbag_wall": {
+  "sandbag": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_sandbag"
+  }
+ },
+ "fp_t56": {
+  "sleeve": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6e4a30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "gun_metal": {
+   "color": "#2a2c2f",
+   "roughness": 0.4,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "gun_wood": {
+   "color": "#7a4523",
+   "roughness": 0.55,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "fp_pistol": {
+  "sleeve": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6e4a30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "pistol_metal": {
+   "color": "#1d1f22",
+   "roughness": 0.35,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "pistol_grip": {
+   "color": "#2a2420",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "fp_svd": {
+  "sleeve": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6e4a30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "svd_metal": {
+   "color": "#26282b",
+   "roughness": 0.4,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "svd_wood": {
+   "color": "#6e3b1c",
+   "roughness": 0.55,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "scope": {
+   "color": "#141516",
+   "roughness": 0.3,
+   "metallic": 0.6,
+   "texture": null
+  },
+  "scope_glass": {
+   "color": "#2b4a5c",
+   "roughness": 0.05,
+   "metallic": 0.4,
+   "texture": null
+  }
+ },
+ "grenade": {
+  "grenade_body": {
+   "color": "#3b4a2c",
+   "roughness": 0.6,
+   "metallic": 0.2,
+   "texture": null
+  },
+  "grenade_metal": {
+   "color": "#8a8a80",
+   "roughness": 0.4,
+   "metallic": 0.8,
+   "texture": null
+  }
+ },
+ "watchtower": {
+  "tower_log": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_bark2"
+  },
+  "plank": {
+   "color": "#6b5232",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "sandbag": {
+   "color": "#ffffff",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": "tex_sandbag"
+  },
+  "thatch": {
+   "color": "#8a7448",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "alarm": {
+  "alarm_pole": {
+   "color": "#4a4d4f",
+   "roughness": 0.5,
+   "metallic": 0.7,
+   "texture": null
+  },
+  "alarm_red": {
+   "color": "#b02a1e",
+   "roughness": 0.4,
+   "metallic": 0.3,
+   "texture": null
+  },
+  "alarm_box": {
+   "color": "#5a6a4a",
+   "roughness": 0.6,
+   "metallic": 0.4,
+   "texture": null
+  }
+ }
+}

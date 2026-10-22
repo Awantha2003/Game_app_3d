@@ -5,6 +5,9 @@ Builds every 3D model used by the game procedurally, saves an editable
 .blend file for each one (blender/models/*.blend) and exports a .glb for
 the game (public/models/*.glb).
 
+It also exports an .fbx of every model, its textures and a materials.json
+into the Unity project (unity/WanniFront/Assets/WanniFront/Resources).
+
 Run with Blender:
     blender -b -P blender/build_assets.py
 or with the `bpy` Python module (pip install bpy):
@@ -28,6 +31,10 @@ from mathutils import Euler, Matrix, Vector
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GLB_DIR = os.path.join(ROOT, "public", "models")
 BLEND_DIR = os.path.join(ROOT, "blender", "models")
+UNITY_RES = os.path.join(ROOT, "unity", "WanniFront", "Assets", "WanniFront", "Resources")
+UNITY_MODELS = os.path.join(UNITY_RES, "Models")
+UNITY_TEX = os.path.join(UNITY_RES, "Textures")
+UNITY_MATERIALS = {}
 TEX = 256
 
 
@@ -38,6 +45,7 @@ TEX = 256
 def reset():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     MATS.clear()
+    MATINFO.clear()
 
 
 def srgb_to_linear(c):
@@ -50,6 +58,7 @@ def hex_rgb(h):
 
 
 MATS = {}
+MATINFO = {}
 
 
 def mat(name, color="#808080", rough=0.85, metal=0.0, image=None):
@@ -66,6 +75,8 @@ def mat(name, color="#808080", rough=0.85, metal=0.0, image=None):
         tex.image = image
         m.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
     MATS[name] = m
+    MATINFO[name] = {"color": color, "roughness": rough, "metallic": metal,
+                     "texture": image.name if image is not None else None}
     return m
 
 
@@ -271,7 +282,35 @@ def save(name):
         export_cameras=False,
         export_lights=False,
     )
+    export_unity(name)
     print("built", name)
+
+
+def export_unity(name):
+    """FBX + PNG textures + material table for the Unity project."""
+    os.makedirs(UNITY_MODELS, exist_ok=True)
+    os.makedirs(UNITY_TEX, exist_ok=True)
+    for img in bpy.data.images:
+        if img.type != "IMAGE" or img.size[0] == 0:
+            continue
+        path = os.path.join(UNITY_TEX, img.name + ".png")
+        if not os.path.exists(path):
+            img.filepath_raw = path
+            img.file_format = "PNG"
+            img.save()
+    bpy.ops.export_scene.fbx(
+        filepath=os.path.join(UNITY_MODELS, name + ".fbx"),
+        use_selection=False,
+        object_types={"EMPTY", "MESH"},
+        apply_scale_options="FBX_SCALE_ALL",
+        axis_forward="-Z",
+        axis_up="Y",
+        mesh_smooth_type="FACE",
+        add_leaf_bones=False,
+        bake_anim=False,
+        path_mode="STRIP",
+    )
+    UNITY_MATERIALS[name] = dict(MATINFO)
 
 
 # --------------------------------------------------------------------------
@@ -716,6 +755,212 @@ def sandbag_wall():
     save("sandbag_wall")
 
 
+# --------------------------------------------------------------------------
+# First-person weapons (Unity). Forward is -Y, origin at the weapon's grip,
+# with "Muzzle" at the barrel tip and "Sight" on the line of sight.
+# --------------------------------------------------------------------------
+
+def fp_arms(p, cloth, skin_m, right_hand, left_hand):
+    """Forearms reaching from below the camera to each hand."""
+    for hand, side in ((right_hand, 1), (left_hand, -1)):
+        hx, hy, hz = hand
+        p.sphere(skin_m, 0.045, (hx, hy, hz), (1.0, 1.3, 0.8), seg=8)
+        elbow = (hx + side * 0.12, hy + 0.32, hz - 0.16)
+        mid = [(a + b) / 2 for a, b in zip(hand, elbow)]
+        dx, dy, dz = (elbow[0] - hx, elbow[1] - hy, elbow[2] - hz)
+        length = math.sqrt(dx * dx + dy * dy + dz * dz)
+        pitch = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
+        yaw = math.degrees(math.atan2(dx, dy))
+        p.box(skin_m, (0.07, length * 0.45, 0.065), (hx + dx * 0.25, hy + dy * 0.25, hz + dz * 0.25), (pitch, 0, -yaw))
+        p.box(cloth, (0.1, length * 0.65, 0.095), (mid[0] + dx * 0.2, mid[1] + dy * 0.2, mid[2] + dz * 0.2), (pitch, 0, -yaw))
+
+
+def fp_weapon(name, build):
+    reset()
+    cloth = mat("sleeve", "#ffffff", 0.95, image=tex_army_dpm())
+    skin_m = mat("skin", "#6e4a30", 0.7)
+    root = empty(name)
+    p = Part("Weapon", 4.0)
+    muzzle, sight, hands = build(p)
+    fp_arms(p, cloth, skin_m, *hands)
+    ob = p.finish(root)
+    empty("Muzzle", ob, muzzle)
+    empty("Sight", ob, sight)
+    save(name)
+
+
+def build_t56(p):
+    metal = mat("gun_metal", "#2a2c2f", 0.4, 0.85)
+    wood = mat("gun_wood", "#7a4523", 0.55)
+    p.box(metal, (0.048, 0.32, 0.07), (0, -0.05, 0.03))
+    p.box(metal, (0.044, 0.30, 0.012), (0, -0.05, 0.071))
+    p.box(metal, (0.016, 0.03, 0.03), (0, 0.0, 0.085))
+    p.cyl(metal, 0.012, 0.42, (0, -0.47, 0.045), (90, 0, 0), seg=10)
+    p.cyl(metal, 0.016, 0.06, (0, -0.68, 0.045), (90, 0, 0), seg=10)
+    p.cyl(metal, 0.011, 0.24, (0, -0.33, 0.078), (90, 0, 0), seg=8)
+    p.box(metal, (0.01, 0.015, 0.05), (0, -0.62, 0.085))
+    p.box(wood, (0.058, 0.2, 0.07), (0, -0.33, 0.04))
+    p.box(wood, (0.05, 0.12, 0.035), (0, -0.33, 0.085))
+    p.box(wood, (0.045, 0.3, 0.075), (0, 0.27, 0.0), (-6, 0, 0))
+    p.box(wood, (0.04, 0.05, 0.11), (0, 0.06, -0.05), (-18, 0, 0))
+    p.box(metal, (0.036, 0.07, 0.19), (0, -0.14, -0.06), (20, 0, 0))
+    p.box(metal, (0.036, 0.07, 0.1), (0, -0.19, -0.17), (32, 0, 0))
+    p.box(metal, (0.02, 0.06, 0.025), (0, -0.02, -0.005))
+    return (0, -0.71, 0.045), (0, 0.0, 0.097), ((0, 0.06, -0.06), (0, -0.33, -0.005))
+
+
+def build_pistol(p):
+    metal = mat("pistol_metal", "#1d1f22", 0.35, 0.85)
+    grip = mat("pistol_grip", "#2a2420", 0.7)
+    p.box(metal, (0.03, 0.19, 0.035), (0, -0.05, 0.06))
+    p.box(metal, (0.028, 0.16, 0.03), (0, -0.04, 0.03))
+    p.box(grip, (0.032, 0.05, 0.11), (0, 0.03, -0.03), (-14, 0, 0))
+    p.box(metal, (0.008, 0.012, 0.012), (0, -0.135, 0.083))
+    p.box(metal, (0.022, 0.012, 0.012), (0, 0.035, 0.083))
+    p.cyl(metal, 0.018, 0.18, (0, -0.24, 0.055), (90, 0, 0), seg=12)
+    return (0, -0.33, 0.055), (0, 0.0, 0.089), ((0.0, 0.04, -0.05), (-0.01, 0.0, -0.07))
+
+
+def build_svd(p):
+    metal = mat("svd_metal", "#26282b", 0.4, 0.85)
+    wood = mat("svd_wood", "#6e3b1c", 0.55)
+    scope = mat("scope", "#141516", 0.3, 0.6)
+    glass = mat("scope_glass", "#2b4a5c", 0.05, 0.4)
+    p.box(metal, (0.046, 0.3, 0.068), (0, -0.05, 0.03))
+    p.cyl(metal, 0.012, 0.62, (0, -0.52, 0.045), (90, 0, 0), seg=10)
+    p.cyl(metal, 0.017, 0.08, (0, -0.85, 0.045), (90, 0, 0), seg=10)
+    p.box(wood, (0.056, 0.26, 0.07), (0, -0.33, 0.04))
+    p.box(wood, (0.04, 0.34, 0.03), (0, 0.27, 0.06), (-4, 0, 0))
+    p.box(wood, (0.045, 0.3, 0.035), (0, 0.27, -0.06), (8, 0, 0))
+    p.box(wood, (0.045, 0.05, 0.13), (0, 0.42, 0.0))
+    p.box(wood, (0.04, 0.05, 0.11), (0, 0.06, -0.05), (-18, 0, 0))
+    p.box(metal, (0.034, 0.08, 0.13), (0, -0.14, -0.05), (10, 0, 0))
+    p.cyl(scope, 0.019, 0.26, (0, -0.03, 0.135), (90, 0, 0), seg=14)
+    p.cyl(scope, 0.026, 0.06, (0, -0.17, 0.135), (90, 0, 0), seg=14)
+    p.cyl(scope, 0.023, 0.05, (0, 0.11, 0.135), (90, 0, 0), seg=14)
+    p.cyl(glass, 0.02, 0.005, (0, 0.137, 0.135), (90, 0, 0), seg=14)
+    p.box(metal, (0.02, 0.1, 0.05), (0, -0.03, 0.09))
+    return (0, -0.9, 0.045), (0, 0.0, 0.135), ((0, 0.06, -0.06), (0, -0.36, -0.005))
+
+
+def grenade():
+    reset()
+    body = mat("grenade_body", "#3b4a2c", 0.6, 0.2)
+    metal = mat("grenade_metal", "#8a8a80", 0.4, 0.8)
+    p = Part("Grenade", 8)
+    p.sphere(body, 0.035, (0, 0, 0), (1, 1, 1.25), seg=12)
+    p.cyl(metal, 0.014, 0.025, (0, 0, 0.05), seg=8)
+    p.box(metal, (0.01, 0.06, 0.008), (0, 0.02, 0.035), (-30, 0, 0))
+    p.cyl(metal, 0.012, 0.004, (0.018, 0, 0.06), (0, 90, 0), seg=8)
+    p.finish()
+    save("grenade")
+
+
+def watchtower():
+    """Log sentry tower of the kind used at LTTE camps and FDLs."""
+    reset()
+    log = mat("tower_log", "#ffffff", 0.95, image=tex_noise("tex_bark2", "#6a5a48", "#4a3f33", 19, 4, 24, stripes=24))
+    plank = mat("plank", "#6b5232", 0.9)
+    bag = mat("sandbag", "#ffffff", 1.0, image=tex_noise("tex_sandbag", "#8e7e5a", "#b2a27a", 3, 12, 12))
+    thatch = mat("thatch", "#8a7448", 1.0)
+    p = Part("Tower", 1.0)
+    H = 5.0
+    for x in (-1.3, 1.3):
+        for y in (-1.3, 1.3):
+            p.cyl(log, 0.12, H + 2.4, (x * 0.92, y * 0.92, (H + 2.4) / 2), (y * 2.5, -x * 2.5, 0), seg=7)
+    for z in (1.4, 3.0):
+        for i, rot in enumerate((0, 90)):
+            p.cyl(log, 0.07, 3.6, (0, 0, z), (45 if i else -45, 0, rot), seg=5)
+    p.box(plank, (3.0, 3.0, 0.12), (0, 0, H))
+    for i in range(14):
+        a = i / 14 * math.tau
+        if -0.4 < math.sin(a) < 0.4 and math.cos(a) > 0:
+            continue
+        p.box(bag, (0.6, 0.3, 0.22), (math.cos(a) * 1.35, math.sin(a) * 1.35, H + 0.17), (0, 0, math.degrees(a) + 90))
+        p.box(bag, (0.6, 0.3, 0.22), (math.cos(a + 0.2) * 1.35, math.sin(a + 0.2) * 1.35, H + 0.39), (0, 0, math.degrees(a + 0.2) + 90))
+    p.cyl(thatch, 2.4, 0.9, (0, 0, H + 2.6), seg=4, r2=0.1, smooth=False)
+    for i in range(9):
+        p.box(plank, (0.5, 0.06, 0.05), (1.5, 1.2, 0.4 + i * 0.55))
+    p.box(plank, (0.06, 0.06, H), (1.75, 1.2, H / 2))
+    p.box(plank, (0.06, 0.06, H), (1.25, 1.2, H / 2))
+    p.finish()
+    save("watchtower")
+
+
+def alarm():
+    """Camp alarm: siren on a pole with a switch box."""
+    reset()
+    metal = mat("alarm_pole", "#4a4d4f", 0.5, 0.7)
+    red = mat("alarm_red", "#b02a1e", 0.4, 0.3)
+    box_m = mat("alarm_box", "#5a6a4a", 0.6, 0.4)
+    p = Part("Alarm", 2.0)
+    p.cyl(metal, 0.05, 3.2, (0, 0, 1.6), seg=8)
+    p.cyl(red, 0.16, 0.35, (0, -0.1, 3.1), (90, 0, 0), seg=12, r2=0.06)
+    p.cyl(red, 0.09, 0.2, (0, 0.1, 3.1), (90, 0, 0), seg=10)
+    p.box(box_m, (0.35, 0.18, 0.45), (0, -0.12, 1.3))
+    p.box(red, (0.06, 0.04, 0.12), (0, -0.22, 1.34))
+    p.cyl(metal, 0.01, 1.6, (0, -0.02, 2.2), seg=4)
+    p.finish()
+    save("alarm")
+
+
+def terrain_textures():
+    """Ground textures (albedo + normal map) for the Unity terrain."""
+    os.makedirs(UNITY_TEX, exist_ok=True)
+    N = 512
+    specs = {
+        "ground_grass": ("#4f6b2a", "#6f8a35", "#3a5220", 21),
+        "ground_drygrass": ("#8a8248", "#a59a5a", "#6d6634", 22),
+        "ground_dirt": ("#6e5236", "#8a6a46", "#4e3a26", 23),
+        "ground_sand": ("#b8a47a", "#cdbb90", "#9c8a62", 24),
+        "ground_mud": ("#4e4532", "#615641", "#3a3324", 25),
+        "ground_paddy": ("#6f9a32", "#8fb640", "#527428", 26),
+    }
+    for name, (c1, c2, c3, seed) in specs.items():
+        big = fbm(N, N, 6, 6, seed, 5)
+        fine = fbm(N, N, 48, 48, seed + 1, 3)
+        streak = fbm(N, N, 96, 12, seed + 2, 2)
+        h = big * 0.5 + fine * 0.35 + streak * 0.15
+        a, b, c = (np.array(hex_rgb(x)) for x in (c1, c2, c3))
+        rgb = a * (1 - big[..., None]) + b * big[..., None]
+        rgb = rgb * (1 - (fine[..., None] < 0.38) * 0.5) + c * ((fine[..., None] < 0.38) * 0.5)
+        rgb *= (0.85 + streak[..., None] * 0.3)
+        save_png(name, np.clip(rgb, 0, 1))
+        gy, gx = np.gradient(h * 6.0)
+        nrm = np.stack([-gx, -gy, np.ones_like(h)], axis=2)
+        nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
+        save_png(name + "_n", nrm * 0.5 + 0.5)
+    # grass blade billboard with alpha for terrain detail
+    rng = np.random.default_rng(5)
+    W, Hh = 128, 128
+    rgba = np.zeros((Hh, W, 4))
+    for i in range(26):
+        x0 = rng.uniform(10, W - 10)
+        top = rng.uniform(0.45, 0.98) * Hh
+        lean = rng.uniform(-18, 18)
+        width = rng.uniform(2.0, 3.5)
+        col = np.array(hex_rgb(["#5d7a2e", "#7a9a3a", "#8a9a48", "#4e6a26"][i % 4]))
+        for y in range(int(top)):
+            t = y / top
+            x = x0 + lean * t * t
+            w = width * (1 - t) + 0.4
+            xs = np.arange(max(0, int(x - w)), min(W, int(x + w) + 1))
+            rgba[y, xs, :3] = col * (0.6 + 0.4 * t)
+            rgba[y, xs, 3] = 1.0
+    save_png("grass_blade", rgba, alpha=True)
+
+
+def save_png(name, arr, alpha=False):
+    h, w = arr.shape[:2]
+    img = bpy.data.images.new(name, w, h, alpha=alpha)
+    if not alpha:
+        arr = np.concatenate([arr, np.ones((h, w, 1))], axis=2)
+    img.pixels.foreach_set(arr.astype(np.float32).ravel())
+    img.filepath_raw = os.path.join(UNITY_TEX, name + ".png")
+    img.file_format = "PNG"
+    img.save()
+
+
 BUILDERS = [
     lambda: soldier("soldier_army", tex_army_dpm, "#6e4a30", "army"),
     lambda: soldier("soldier_ltte", tex_tiger_stripe, "#5e3e28", "ltte"),
@@ -723,9 +968,18 @@ BUILDERS = [
     lambda: house(False), lambda: house(True),
     water_tower, sluice_gate, coconut_palm, palmyrah_palm, jungle_tree, bush,
     rock_outcrop, small_rock, crates, sandbag_wall,
+    lambda: fp_weapon("fp_t56", build_t56),
+    lambda: fp_weapon("fp_pistol", build_pistol),
+    lambda: fp_weapon("fp_svd", build_svd),
+    grenade, watchtower, alarm,
 ]
 
 
 if __name__ == "__main__":
+    import json
     for build in BUILDERS:
         build()
+    reset()
+    terrain_textures()
+    with open(os.path.join(UNITY_RES, "materials.json"), "w") as f:
+        json.dump(UNITY_MATERIALS, f, indent=1)

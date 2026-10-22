@@ -19,7 +19,14 @@ Each mission has a historical briefing and debrief. The campaign ends with an ep
 
 ![Nandikadal](docs/nandikadal.png)
 
-## Gameplay
+## Two versions
+
+- **Unity (first-person, IGI-style)**: [`unity/WanniFront`](unity/WanniFront/README.md). Stealth AI with detection meters, camp alarms, watchtowers, binoculars with enemy marking, a tactical map, a T-56 rifle, a suppressed pistol, an SVD sniper rifle and grenades, Unity Terrain with grass, and rain or a different time of day per mission. Open it with Unity 6 LTS and press Play.
+- **Web (third-person, Three.js)**: the root of this repo. It runs in any browser and on phones.
+
+Both versions use the same Blender models from `blender/build_assets.py`.
+
+## Gameplay (web version)
 
 - Third-person shooter with a Type 56 (T-56) rifle, aim down sights, recoil, reloading and ammo resupply at supply crates
 - Each mission has a chain of objectives: clear areas, reach locations, open the Mavil Aru sluice gates, plant charges on Sea Tiger boats, and escort civilians
