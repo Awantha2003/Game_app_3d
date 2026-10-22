@@ -1,0 +1,23 @@
+{
+  "name": "wanni-front",
+  "version": "1.0.0",
+  "description": "Wanni Front - a 3D third-person game based on the final phase of the Sri Lankan Civil War (Eelam War IV, 2006-2009). Models built with Blender.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "assets": "blender -b -P blender/build_assets.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Awantha2003/game_app_3d.git"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
+}

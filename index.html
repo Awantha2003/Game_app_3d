@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#11140c" />
+  <title>Wanni Front – Eelam War IV</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600&family=Noto+Sans+Sinhala:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="objective">
+      <div class="obj-mission"></div>
+      <div class="obj-text"></div>
+      <div class="obj-sub"></div>
+    </div>
+    <div class="compass"><div class="compass-strip"></div><div class="compass-tick"></div></div>
+    <div class="crosshair"><i></i><i></i><i></i><i></i></div>
+    <div class="hitmarker">✕</div>
+    <div class="waypoint"><span class="wp-dot"></span><span class="wp-dist"></span></div>
+    <div class="prompt"><div class="prompt-text"></div><div class="prompt-bar"><div></div></div></div>
+    <div class="toasts"></div>
+    <div class="killfeed"></div>
+    <div class="status">
+      <div class="hp"><div class="hp-label">HEALTH</div><div class="hp-bar"><div></div></div></div>
+    </div>
+    <div class="ammo"><span class="ammo-mag">30</span><span class="ammo-res">/ 240</span><div class="ammo-name">T-56</div></div>
+    <div class="vignette"></div>
+    <div class="squad"></div>
+  </div>
+
+  <!-- touch controls -->
+  <div id="touch" class="hidden">
+    <div class="stick-zone"></div>
+    <div class="look-zone"></div>
+    <div class="stick"><div class="knob"></div></div>
+    <button class="tbtn btn-fire">FIRE</button>
+    <button class="tbtn btn-aim">AIM</button>
+    <button class="tbtn btn-reload">R</button>
+    <button class="tbtn btn-action">E</button>
+    <button class="tbtn btn-sprint">RUN</button>
+    <button class="tbtn btn-pause">II</button>
+  </div>
+
+  <!-- screens -->
+  <div id="screen" class="screen">
+    <div class="panel menu" data-screen="loading">
+      <h1>WANNI FRONT</h1>
+      <div class="si">වන්නි සටන් බිම</div>
+      <div class="loading"><div class="loading-bar"><div></div></div><div class="loading-text">Loading Blender models…</div></div>
+    </div>
+
+    <div class="panel menu hidden" data-screen="menu">
+      <div class="eyebrow">Eelam War IV · 2006 – 2009</div>
+      <h1>WANNI FRONT</h1>
+      <div class="si">වන්නි සටන් බිම</div>
+      <p class="lede">A third-person campaign following the Sri Lanka Army through six real operations of the final phase of the civil war — from Mavil Aru to Nandikadal.</p>
+      <div class="missions"></div>
+      <div class="row">
+        <label>Difficulty
+          <select id="difficulty">
+            <option value="0.6">Recruit</option>
+            <option value="1" selected>Soldier</option>
+            <option value="1.45">Veteran</option>
+          </select>
+        </label>
+      </div>
+      <div class="controls">
+        <b>Controls</b> WASD move · Mouse aim · Left click fire · Right click aim down sights · Shift sprint · R reload · E interact · Esc pause
+      </div>
+      <p class="note">Based on public historical records. Respect for all who lost their lives — soldiers, cadres and civilians.</p>
+    </div>
+
+    <div class="panel briefing hidden" data-screen="briefing">
+      <div class="eyebrow b-date"></div>
+      <h2 class="b-title"></h2>
+      <div class="si b-si"></div>
+      <div class="b-place"></div>
+      <div class="b-text"></div>
+      <div class="b-objs-title">Objectives</div>
+      <ol class="b-objs"></ol>
+      <div class="row"><button class="btn primary" data-act="begin">Begin mission</button><button class="btn" data-act="menu">Back</button></div>
+    </div>
+
+    <div class="panel hidden" data-screen="pause">
+      <h2>Paused</h2>
+      <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
+    </div>
+
+    <div class="panel hidden" data-screen="complete">
+      <div class="eyebrow">Mission complete</div>
+      <h2 class="c-title"></h2>
+      <p class="c-text"></p>
+      <div class="c-stats"></div>
+      <div class="row"><button class="btn primary" data-act="next">Continue</button><button class="btn" data-act="menu">Menu</button></div>
+    </div>
+
+    <div class="panel hidden" data-screen="failed">
+      <div class="eyebrow red">Mission failed</div>
+      <h2 class="f-title"></h2>
+      <div class="row"><button class="btn primary" data-act="restart">Retry</button><button class="btn" data-act="menu">Menu</button></div>
+    </div>
+
+    <div class="panel hidden" data-screen="epilogue">
+      <div class="eyebrow">18 – 19 May 2009</div>
+      <h2>The end of the war</h2>
+      <div class="e-text"></div>
+      <div class="row"><button class="btn primary" data-act="menu">Main menu</button></div>
+    </div>
+  </div>
+
+  <div id="clickToPlay" class="hidden">Click to resume</div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
