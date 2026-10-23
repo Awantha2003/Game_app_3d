@@ -856,6 +856,30 @@ def build_pistol(p):
     return (0, -0.33, 0.055), (0, 0.0, 0.089), ((0.0, 0.04, -0.05), (-0.01, 0.0, -0.07))
 
 
+def build_lmg(p):
+    """Belt-fed light machine gun: heavy barrel, bipod, ammunition box, skeleton stock."""
+    metal = mat("lmg_metal", "#24262a", 0.4, 0.85)
+    dark = mat("lmg_dark", "#18191b", 0.5, 0.7)
+    olive = mat("lmg_box", "#3d4128", 0.7, 0.3)
+    wood = mat("lmg_wood", "#5a3418", 0.6)
+    p.box(metal, (0.055, 0.36, 0.08), (0, -0.06, 0.03))                      # receiver
+    p.box(metal, (0.05, 0.2, 0.02), (0, -0.08, 0.078))                       # feed cover
+    p.cyl(dark, 0.017, 0.62, (0, -0.55, 0.04), (90, 0, 0), seg=10)           # heavy barrel
+    p.cyl(dark, 0.024, 0.09, (0, -0.86, 0.04), (90, 0, 0), seg=10)           # flash hider
+    p.cyl(metal, 0.01, 0.38, (0, -0.4, 0.075), (90, 0, 0), seg=8)            # gas tube
+    p.box(metal, (0.012, 0.03, 0.05), (0, -0.8, 0.08))                       # front sight
+    p.box(dark, (0.02, 0.05, 0.05), (0, -0.25, 0.1))                         # carry handle
+    for sx in (-1, 1):                                                       # bipod legs
+        p.cyl(metal, 0.007, 0.3, (sx * 0.05, -0.72, -0.08), (20, sx * 18, 0), seg=6)
+    p.box(olive, (0.1, 0.12, 0.12), (0.06, -0.08, -0.07))                    # ammunition box
+    p.box(dark, (0.035, 0.06, 0.012), (0.03, -0.08, 0.0))                    # belt
+    p.box(wood, (0.04, 0.05, 0.11), (0, 0.06, -0.05), (-18, 0, 0))           # pistol grip
+    p.box(metal, (0.02, 0.3, 0.02), (0, 0.27, 0.02))                         # skeleton stock
+    p.box(metal, (0.02, 0.26, 0.02), (0, 0.27, -0.05), (-8, 0, 0))
+    p.box(wood, (0.045, 0.05, 0.12), (0, 0.42, -0.02))                       # butt plate
+    return (0, -0.91, 0.04), (0, 0.0, 0.1), ((0, 0.06, -0.06), (0, -0.4, -0.02))
+
+
 def build_svd(p):
     metal = mat("svd_metal", "#26282b", 0.4, 0.85)
     wood = mat("svd_wood", "#6e3b1c", 0.55)
@@ -1249,6 +1273,33 @@ def foliage_textures():
         save_public(img)
 
 
+def artillery():
+    """Towed field gun in an earth-and-sandbag emplacement (generic, not a specific model)."""
+    reset()
+    olive = mat("gun_olive", "#4a4e32", 0.7, 0.3)
+    dark = mat("gun_steel", "#25272a", 0.45, 0.8)
+    tyre = mat("tyre", "#151515", 0.9)
+    bag = mat("sandbag", "#ffffff", 1.0, image=tex_noise("tex_sandbag2", "#a08a60", "#806a44", 61, 6, 6))
+    p = Part("Gun", 0.8)
+    p.box(olive, (1.0, 0.7, 0.35), (0, 0.1, 0.75))                                 # carriage
+    p.box(olive, (1.6, 0.06, 0.9), (0, -0.25, 1.1), (8, 0, 0))                     # gun shield
+    p.cyl(dark, 0.11, 0.9, (0, 0.3, 1.0), (90, 0, 0), seg=12)                      # recoil cylinder
+    p.cyl(dark, 0.075, 3.4, (0, -1.6, 1.08), (86, 0, 0), seg=12)                   # barrel
+    p.cyl(dark, 0.11, 0.3, (0, -3.25, 1.2), (86, 0, 0), seg=12)                    # muzzle brake
+    for sx in (-1, 1):
+        p.cyl(tyre, 0.45, 0.22, (sx * 0.7, 0.1, 0.45), (0, 90, 0), seg=16)        # wheels
+        p.cyl(dark, 0.2, 0.24, (sx * 0.7, 0.1, 0.45), (0, 90, 0), seg=10)
+        p.box(olive, (0.12, 2.4, 0.12), (sx * 0.45, 1.4, 0.35), (6, 0, sx * 12))  # split trail
+    for i in range(14):                                                           # sandbag ring
+        a = math.radians(-60 + i * 240 / 13)
+        p.box(bag, (0.7, 0.35, 0.3), (math.sin(a) * 2.6, math.cos(a) * 2.6 + 0.4, 0.15), (0, 0, -math.degrees(a)))
+        p.box(bag, (0.7, 0.35, 0.3), (math.sin(a + 0.1) * 2.6, math.cos(a + 0.1) * 2.6 + 0.4, 0.45), (0, 0, -math.degrees(a)))
+    for i in range(3):                                                            # shell boxes
+        p.box(olive, (0.5, 0.3, 0.25), (1.6, 1.2 + i * 0.35, 0.13))
+    p.finish()
+    save("artillery")
+
+
 def weapon_model(name, build):
     """Weapon on its own (third-person), origin at the grip, with a Muzzle empty."""
     reset()
@@ -1444,6 +1495,8 @@ BUILDERS = [
     lambda: soldier("soldier_sf", tex_army_dpm, "#6e4a30", "army", hat="boonie", paint=True),
     lambda: soldier("soldier_ghillie", tex_army_dpm, "#6a4630", "army", hat="boonie", paint=True, ghillie=True, weapon="svd"),
     lambda: weapon_model("wpn_svd", build_svd),
+    lambda: weapon_model("wpn_lmg", build_lmg),
+    artillery,
     lambda: weapon_model("wpn_pistol", build_pistol),
     helicopter, arrow_boat,
     civilian, buffel, sea_tiger_boat, bunker, earth_bund,

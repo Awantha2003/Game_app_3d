@@ -1,7 +1,7 @@
 // End-to-end campaign test: builds the game, serves it, and lets a simple bot
 // play the whole campaign in headless Chromium.
 //
-//   npm run test:campaign            (all six missions)
+//   npm run test:campaign            (all ten missions)
 //   npm run test:campaign -- 0 2     (only missions 1 and 3)
 //
 // Needs Playwright with Chromium: `npx playwright install chromium`.
@@ -41,15 +41,15 @@ try {
   check(true, 'prologue can be skipped and the main menu opens');
 
   // every enabled main-menu button opens something
-  for (const act of ['missions', 'squad', 'profile', 'archive', 'settings', 'credits']) {
+  for (const act of ['missions', 'loadout', 'squad', 'profile', 'archive', 'settings', 'credits']) {
     await page.click(`[data-screen="menu"] [data-act="${act}"]`);
     const open = await page.evaluate(() => [...document.querySelectorAll('#screen .panel')].find((p) => !p.classList.contains('hidden'))?.dataset.screen);
     check(open === act, `menu "${act}" opens`);
-    await page.click(`[data-screen="${act}"] [data-act="menu"]`);
+    await page.click(`[data-screen="${act}"] [data-act="${act === 'loadout' ? 'loadout-back' : 'menu'}"]`);
   }
 
   // play the campaign with an in-page bot (rendering is skipped for speed)
-  const missions = only.length ? only : [0, 1, 2, 3, 4, 5];
+  const missions = only.length ? only : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   for (const i of missions) {
     const r = await page.evaluate(async (mi) => {
       const g = window.__game;
@@ -108,6 +108,7 @@ try {
         marked: g.units.filter((u) => u.marked).length, alarms: g.world.alarms.map((a) => (a.triggered ? 'T' : a.disabled ? 'D' : '-')).join(''),
         xp: document.querySelector('.xp-box')?.textContent || '',
         fail: document.querySelector('.f-title').textContent,
+        stuck: g.state === 'playing' ? `objective ${g.objIndex + 1} "${g.currentObjective()?.text}" ${document.querySelector('.obj-sub').textContent}, player at ${g.player.pos.x.toFixed(0)},${g.player.pos.z.toFixed(0)}` : '',
         totalXP: g.profile.xp, rank: g.profile.rank.id,
       };
       g.renderer.setAnimationLoop(() => g.frame());
@@ -115,7 +116,7 @@ try {
     }, i);
     check(r.fiction, `mission ${i + 1}: briefing shows the fiction block`);
     check(!r.insertion || r.inserted, `mission ${i + 1}: ${r.insertion || 'no'} insertion played (alarms ${r.alarms || 'none'})`);
-    check(r.state === 'complete', `mission ${i + 1}: completed in ${r.time}s game time${r.fail ? ` (failed: ${r.fail})` : ''}`);
+    check(r.state === 'complete', `mission ${i + 1}: completed in ${r.time}s game time${r.fail ? ` (failed: ${r.fail})` : ''}${r.stuck ? ` (stuck at ${r.stuck})` : ''}`);
     check(/Mission XP/.test(r.xp), `mission ${i + 1}: debrief shows XP (${r.totalXP} total, rank ${r.rank})`);
     if (r.state !== 'complete') continue;
     // DOM clicks here: software rendering in headless Chromium is too slow for pointer actionability checks
@@ -137,7 +138,7 @@ try {
     const after = await page.evaluate(() => window.__game.profile.xp);
     check(before > 0 && before === after, `XP saved across reload (${after})`);
     const rank = await page.evaluate(() => window.__game.profile.rank.id);
-    check(rank === 'capt', `rank after the campaign is Captain (${rank})`);
+    check(rank === 'maj', `rank after the campaign is Major (${rank})`);
   }
 
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`);

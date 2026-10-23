@@ -29,6 +29,24 @@ export const ATMOSPHERE = {
     grade: { sat: 1.06, tint: [1.02, 1.0, 0.97] },
     dress: { fern: 40, banana: 26, log: 4, tree2: 25 },
   }),
+  // Hot afternoon over the scrub and palmyrah south of Koddiyar Bay.
+  sampur: merge(BASE, {
+    sunElev: 38, sunAzim: 250, sunColor: '#ffe2b8', sunIntensity: 3.0,
+    skyTop: '#6593c2', horizon: '#e2dccb', clouds: 0.25,
+    fog: ['#d6d2c2', 40, 250], dryness: 0.6, litter: 0.05,
+    weather: { dust: 0.6, wind: 1.3 },
+    grade: { sat: 1.0, contrast: 1.06, tint: [1.05, 1.0, 0.93] },
+    dress: { fern: 0, banana: 10, log: 3, tree2: 0 },
+  }),
+  // Early morning mist on the Vakarai lagoon.
+  vakarai: merge(BASE, {
+    sunElev: 16, sunAzim: 95, sunColor: '#ffd2a0', sunIntensity: 2.4,
+    skyTop: '#62849f', horizon: '#e4d7c2', clouds: 0.35, cloudColor: '#ffe2c8',
+    fog: ['#c8cdc4', 25, 200], exposure: 1.05,
+    weather: { mist: 0.8 }, dryness: 0.05, litter: 0.6,
+    grade: { sat: 1.02, contrast: 1.06, tint: [1.03, 1.0, 0.96] },
+    dress: { fern: 120, banana: 30, log: 10, tree2: 0 },
+  }),
   // Dawn in the Thoppigala jungle: low warm sun through ground mist.
   thoppigala: merge(BASE, {
     sunElev: 12, sunAzim: 80, sunColor: '#ffc58f', sunIntensity: 2.4,
@@ -69,6 +87,26 @@ export const ATMOSPHERE = {
     weather: { dust: 1, wind: 1.3 }, dryness: 0.85, litter: 0,
     grade: { sat: 0.95, contrast: 1.04, tint: [1.04, 1.01, 0.95] },
     dress: { fern: 0, banana: 0, log: 1, tree2: 0 },
+  }),
+  // Anandapuram: shelling smoke over the coconut groves.
+  anandapuram: merge(BASE, {
+    sunElev: 34, sunAzim: 200, sunColor: '#ffdcb4', sunIntensity: 2.2,
+    hemiSky: '#b4b4ac', hemiIntensity: 0.6,
+    skyTop: '#80888e', horizon: '#d2c8b6', clouds: 0.6, cloudColor: '#cec4b4',
+    fog: ['#c4bcaa', 28, 210],
+    weather: { dust: 0.6, smoke: 3 }, dryness: 0.5, litter: 0.05,
+    grade: { sat: 0.85, contrast: 1.07, tint: [1.04, 1.0, 0.94], vignette: 0.38 },
+    dress: { fern: 6, banana: 10, log: 4, tree2: 0 },
+  }),
+  // The night of the Puthumathalan breach: moonlight and sea mist.
+  puthumathalan: merge(BASE, {
+    sunElev: 35, sunAzim: 120, sunColor: '#9fb4d8', sunIntensity: 0.55,
+    hemiSky: '#334466', hemiGround: '#1a1a14', hemiIntensity: 0.35, envIntensity: 0.25,
+    skyTop: '#04060c', horizon: '#18202e', clouds: 0.35, cloudColor: '#2a3344',
+    fog: ['#0d121c', 15, 150], exposure: 1.35,
+    weather: { mist: 0.6, wind: 0.8 }, dryness: 0.35, litter: 0.05,
+    grade: { sat: 0.7, contrast: 1.1, tint: [0.9, 0.97, 1.1], vignette: 0.45, grain: 0.05 },
+    dress: { fern: 6, banana: 8, log: 3, tree2: 0 },
   }),
   // The last weeks at Nandikadal: smoke over the lagoon, muted light.
   nandikadal: merge(BASE, {

@@ -48,7 +48,7 @@ Rules:
 ### Prologue — *The Road to Wanni* (cinematic, skippable)
 1. Black screen. Rain, wind, distant thunder.
 2. Text: "Sri Lanka. 1983 – 2009. A war that lasted twenty-six years."
-3. A map of the island draws in. The six operation sites appear one by one with their dates.
+3. A map of the island draws in. The ten operation sites appear one by one with their dates.
 4. Historical caption: the 2002 ceasefire, its collapse in 2006, and Mavil Aru.
 5. Fiction caption: "This is the story of one fictional section and the officer who led it."
 6. A 3D fly-over of the Mavil Aru paddy fields. The squad is introduced (name + role cards).
@@ -58,8 +58,8 @@ Rules:
 | # | Mission | History | Gameplay | Status |
 |---|---|---|---|---|
 | 1 | **Mavil Aru — The Gates** | Gates closed 21 Jul 2006; Operation Watershed; gates reopened in early August | Tutorial (movement, shooting, health, ammo, orders); clear outpost; secure anicut; open gates | ✅ exists → story added |
-| 1b | *Sampur — The Heights* (planned) | Captured 4 Sep 2006, protecting Trincomalee harbour | Assault artillery positions on a ridge; destroy guns with charges | 🔜 |
-| 1c | *Vakarai — The Corridor* (planned) | Captured 19 Jan 2007; civilians evacuated through corridors | Hold a humanitarian corridor open while families pass; escort; no-fire rules | 🔜 |
+| 1b | **Sampur — The Heights** | Captured 4 Sep 2006, protecting Trincomalee harbour | Bunker line, gun line with an alarm, charges on two field guns, village | ✅ M5 |
+| 1c | **Vakarai — The Corridor** | Captured 19 Jan 2007; civilians evacuated through corridors | Boat insertion, lagoon shore, families escorted to the boats, Prakash joins | ✅ M5 |
 | 2 | **Thoppigala — Into the Jungle** | Campaign Apr–Jul 2007; summit taken 11 Jul 2007 | Dense jungle, patrols, sentry towers, binocular scouting, stealth, alarm sabotage | ✅ exists → story added |
 
 ### Act II — The Wanni (2008–Jan 2009)
@@ -72,8 +72,8 @@ Rules:
 ### Act III — The Final Months (2009)
 | # | Mission | History | Gameplay | Status |
 |---|---|---|---|---|
-| 5b | *Anandapuram — The Ring* (planned) | Encirclement 1–5 Apr 2009 | Hold a sector of the ring at night against counter-attacks | 🔜 |
-| 5c | *Puthumathalan — The Night Crossing* (planned) | 19–20 Apr 2009 commandos breached the bund; large numbers of civilians crossed the lagoon | Night infiltration across the lagoon with suppressed weapons (stealth, as in classic tactical shooters), breach the bund, then guide civilians across under fire | 🔜 |
+| 5b | **Anandapuram — The Ring** | Encirclement 1–5 Apr 2009 | Clear the grove, hold the junction against three counter-attack waves (new *hold* objective), take the positions behind the bund | ✅ M5 |
+| 5c | **Puthumathalan — The Night Crossing** | 19–20 Apr 2009 commandos breached the bund; large numbers of civilians crossed the lagoon | Night mission with NVGs and reduced enemy sight: silence the siren, blow the bund, clear the breach, lead families through | ✅ M5 |
 | 6 | **Nandikadal — The Final Chapter** | Final fighting 15–19 May 2009 | Civilian protection and evacuation are the main objectives; combat is separate from rescue | ✅ exists → story added |
 
 ### Epilogue — *Remember and Rebuild*
@@ -136,14 +136,14 @@ Rules:
 | B/C | **M1 — Story campaign** | Prologue cinematic, characters, radio dialogue for every mission, history/fiction briefing and debrief, XP and ranks, promotion celebration, Profile, Historical Archive, Settings, Credits, epilogue timeline | ✅ (this milestone) |
 | D | M2 — Tactical feel | Crouch/prone, stealth detection meter, patrols, suspicious/search AI, alarms with runners and reinforcements, watchtower sentries (climbable), binoculars + marking, tactical map, insertion by helicopter / navy boat / APC, squad orders (follow/hold, Bravo team move, weapons free/tight), marksman with ghillie suit, suppressed pistol, SVD with scope sway and breath, grenades | ✅ |
 | — | Visual upgrade (environment) | Alpha-card foliage with wind, more vegetation types, splat-textured terrain with tracks, mud, sand, puddles and canopy shade, sky dome and image-based light, per-mission atmosphere and weather, distant hills, colour grade, MSAA and bloom, low/medium/high quality, menu flyover, letterbox, title card, outro camera, contact shadows | ✅ first pass |
-| D | M3 — Squad roles | Medic healing, support gunner suppression, flanking AI, cover use | 🔜 |
-| E | M4 — Loadout | Loadout screen, LMG, rank unlocks, night vision for night missions | 🔜 |
-| C | M5 — New missions | Sampur, Vakarai, Anandapuram, Puthumathalan | 🔜 |
-| F | M6 — Co-op | PeerJS lobby, invite links, sync, disconnect handling | 🔜 |
+| D | M3 — Squad roles | Medic healing (H to call, dressings, 60% natural limit), support gunner suppression, cover search and use, enemy flanking with call-outs | ✅ |
+| E | M4 — Loadout | Loadout screen (menu and briefing), machine gun, extra magazines, grenade pouch, rank unlocks, night vision (N) | ✅ |
+| C | M5 — New missions | Sampur, Vakarai, Anandapuram, Puthumathalan (10 missions in chronological order; saves migrate) | ✅ |
+| F | M6 — Co-op | PeerJS lobby, invite links, host-authoritative sync, guest hits/grenades/interactions, shared XP, disconnect handling; automated two-browser test | ✅ |
 | G | M7 — Release | Graphics settings (low/medium/high) ✅, Vercel deployment with auto-deploy from `main` ✅ (https://wanni-front.vercel.app), performance pass on real hardware 🔜 | 🟡 |
 
 ## 9. Testing
 
 - `npm run build`: production build.
-- `npm run test:campaign`: a headless browser bot plays all six missions from start to finish and checks that each one can be completed, with no page errors. It needs Playwright with Chromium (`npx playwright install chromium`).
+- `npm run test:campaign`: a headless browser bot plays all ten missions from start to finish and checks that each one can be completed, with no page errors. It needs Playwright with Chromium (`npx playwright install chromium`).
 - Manual checklist each milestone: prologue skip, pause/resume, mouse unlock, mission fail/retry, save/continue, profile reset.

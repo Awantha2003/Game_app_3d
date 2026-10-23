@@ -13,6 +13,7 @@ const COLLIDERS = {
   palm_palmyrah: [{ t: 'c', x: 0, z: 0, r: 0.3, h: 12 }],
   tree_jungle: [{ t: 'c', x: 0, z: 0, r: 0.45, h: 7 }],
   tree_rain2: [{ t: 'c', x: 0, z: 0, r: 0.32, h: 5 }],
+  artillery: [{ t: 'c', x: 0, z: 0.2, r: 1.1, h: 1.6 }],
   fallen_log: [{ t: 'b', x: 0, z: 0, hw: 0.35, hd: 2.7, h: 0.6 }],
   hut: [{ t: 'b', x: 0, z: 0, hw: 2.25, hd: 1.75, h: 3.9 }],
   banana: [{ t: 'c', x: 0, z: 0, r: 0.14, h: 2.3 }],
@@ -47,6 +48,8 @@ const UP = new THREE.Vector3(0, 1, 0);
 const CLEARING = { bunker: 6, house: 7, house_ruined: 7, hut: 5.5, sandbag_wall: 3.5, supplies: 3, watchtower: 4.5, buffel: 5, alarm: 2.5, sluice_gate: 9, water_tower: 6 };
 const SHADE = { tree_jungle: 4.2, tree_rain2: 3.2, palm_coconut: 2, palm_palmyrah: 2.2, bush: 1.5, banana: 1.4, house: 4.5, hut: 3.4, rock_outcrop: 14, fern: 0.9 };
 const SPLAT_RES = 512;
+const COVER = new Set(['sandbag_wall', 'bunker', 'rock_small', 'house', 'house_ruined', 'hut', 'earth_bund', 'fallen_log',
+  'tree_jungle', 'tree_rain2', 'palm_coconut', 'palm_palmyrah', 'buffel', 'supplies', 'water_tower', 'sluice_gate']);
 const GRASS_COUNT = { low: 6000, medium: 13000, high: 22000 };
 const TILES = 6;
 
@@ -468,12 +471,44 @@ export class World {
       const lx = s.x * scale, lz = s.z * scale;
       const c = {
         t: s.t, x: x + lx * cos + lz * sin, z: z - lx * sin + lz * cos,
-        y0: y - 0.5, y1: y + s.h * scale, rot, ref,
+        y0: y - 0.5, y1: y + s.h * scale, rot, ref, type,
       };
       if (s.t === 'c') c.r = s.r * scale;
       else { c.hw = s.hw * scale; c.hd = s.hd * scale; }
       this.colliders.push(c);
     }
+  }
+
+  // A spot behind a wall, rock, tree or building, on the far side from the
+  // threat and within maxD of pos, that really blocks the threat's line of
+  // sight at crouching height. Returns {x, z} or null.
+  findCover(pos, threat, maxD) {
+    let best = null, bestScore = Infinity;
+    const eye = new THREE.Vector3(threat.x, threat.y + 1.4, threat.z), pt = new THREE.Vector3();
+    let tests = 0;
+    for (const c of this.colliders) {
+      if (!COVER.has(c.type)) continue;
+      const cd = Math.hypot(c.x - pos.x, c.z - pos.z);
+      if (cd > maxD + 3) continue;
+      let dx = c.x - threat.x, dz = c.z - threat.z;
+      const dl = Math.hypot(dx, dz) || 1;
+      dx /= dl; dz /= dl;
+      let ext;
+      if (c.t === 'c') ext = c.r;
+      else {
+        const cos = Math.cos(c.rot), sin = Math.sin(c.rot);
+        ext = Math.abs(dx * cos - dz * sin) * c.hw + Math.abs(dx * sin + dz * cos) * c.hd;
+      }
+      const x = c.x + dx * (ext + 0.65), z = c.z + dz * (ext + 0.65);
+      const d = Math.hypot(x - pos.x, z - pos.z);
+      if (d > maxD || d + 1 >= bestScore || this.isWater(x, z, 0.1) || this.blocked(x, z, 0.3)) continue;
+      if (++tests > 8) break;
+      pt.set(x, this.height(x, z) + 0.85, z);
+      if (this.lineOfSight(eye, pt)) continue;
+      best = { x, z };
+      bestScore = d + 1;
+    }
+    return best;
   }
 
   blocked(x, z, margin) {
@@ -566,7 +601,7 @@ export class World {
 
   addTarget(tag, x, z, opts) {
     const y = this.height(x, z);
-    const t = { tag, x, y, z, label: opts.label || tag, time: opts.time || 2, plant: !!opts.plant, done: false, obj: null };
+    const t = { tag, x, y, z, label: opts.label || tag, time: opts.time || 2, plant: !!opts.plant, done: false, obj: null, blast: opts.blast, doneText: opts.doneText };
     if (opts.model) {
       const obj = models[opts.model].clone(true);
       obj.position.set(x, Math.max(y, this.water ?? y) - 0.2, z);

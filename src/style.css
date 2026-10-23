@@ -326,3 +326,25 @@ select { background: #222818; color: var(--ink); border: 1px solid var(--line); 
 #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; z-index: 6; }
 #fade.up { animation: fadeup 1.6s ease forwards; }
 @keyframes fadeup { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---- loadout ---- */
+.loadout h3 { margin: 14px 0 6px; }
+.lo-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.lo-item { text-align: left; padding: 10px 12px; background: rgba(255, 255, 255, 0.04); color: inherit; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 6px; cursor: pointer; font: inherit; }
+.lo-item b { display: block; font-family: Oswald, sans-serif; letter-spacing: 0.04em; }
+.lo-item small { display: block; opacity: 0.75; margin-top: 4px; }
+.lo-item.on { border-color: #e0b84a; background: rgba(224, 184, 74, 0.14); }
+.lo-item:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---- night vision ---- */
+body.nvg #game { filter: grayscale(1) sepia(1) hue-rotate(58deg) saturate(3.2) brightness(1.15) contrast(1.15); }
+#nvg-overlay { position: fixed; inset: 0; pointer-events: none; z-index: 3; display: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.85) 78%), repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px); }
+body.nvg #nvg-overlay { display: block; }
+
+/* ---- co-op lobby ---- */
+.coop-status { margin: 12px 0; padding: 10px 12px; border-left: 3px solid #7fc8e8; background: rgba(127, 200, 232, 0.08); }
+.coop-invite { display: flex; gap: 8px; margin: 8px 0; }
+.coop-invite .coop-link { flex: 1; min-width: 0; padding: 8px; background: rgba(0, 0, 0, 0.35); color: inherit; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; font: 13px/1.2 monospace; }
+.coop-host-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.coop-host-controls select { padding: 6px; }

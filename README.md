@@ -1,6 +1,6 @@
 # Wanni Front — Eelam War IV (2006–2009)
 
-**වන්නි සටන් බිම** is a 3D third-person game that runs in the browser. You play a Sri Lanka Army soldier through six real operations from the final phase of the Sri Lankan Civil War. All 3D models are built in **Blender** with a Python script, and the game runs on **Three.js**.
+**වන්නි සටන් බිම** is a 3D third-person game that runs in the browser. You play a Sri Lanka Army soldier through ten real operations from the final phase of the Sri Lankan Civil War. All 3D models are built in **Blender** with a Python script, and the game runs on **Three.js**.
 
 **Play online:** https://wanni-front.vercel.app. It is hosted on Vercel, and every push to `main` deploys automatically. Use a desktop browser with a mouse and keyboard.
 
@@ -11,11 +11,15 @@
 | # | Mission | Date | What happened |
 |---|---------|------|---------------|
 | 1 | **Mavil Aru** · මාවිල් ආරු | Jul–Aug 2006 | The LTTE closed the anicut's sluice gates on 21 July 2006. Troops reopened them on 8 August, and this is usually seen as the start of Eelam War IV. |
-| 2 | **Thoppigala** · තොප්පිගල | Jul 2007 | The LTTE's last eastern stronghold, "Baron's Cap", was captured on 11 July 2007. |
-| 3 | **Pooneryn** · පූනරින් | Nov 2008 | Task Force 1 / 58 Division took Nachchikuda's Sea Tiger base, then entered Pooneryn on 15 Nov 2008 (12 GW and 10 GR). |
-| 4 | **Kilinochchi** · කිලිනොච්චිය | Nov 2008 – Jan 2009 | Troops broke the earth-bund defences and took the LTTE's administrative centre on 2 Jan 2009. The toppled water tower is in the game. |
-| 5 | **Elephant Pass** · අලිමංකඩ | Jan 2009 | The causeway was retaken on 9 Jan 2009, which reopened the A9 land route to Jaffna. |
-| 6 | **Nandikadal** · නන්දිකඩාල් | May 2009 | You lead civilians out of the combat zone. The war ended on 18–19 May 2009. |
+| 2 | **Sampur** · සාම්පූර් | Aug–Sep 2006 | LTTE guns at Sampur could shell Trincomalee harbour. Troops entered Sampur on 4 September 2006. You destroy the gun line with charges. |
+| 3 | **Vakarai** · වාකරේ | Jan 2007 | Tens of thousands of civilians left the area before troops took Vakarai on 19 January 2007. You bring families to the boats; Prakash joins the section. |
+| 4 | **Thoppigala** · තොප්පිගල | Jul 2007 | The LTTE's last eastern stronghold, "Baron's Cap", was captured on 11 July 2007. |
+| 5 | **Pooneryn** · පූනරින් | Nov 2008 | Task Force 1 / 58 Division took Nachchikuda's Sea Tiger base, then entered Pooneryn on 15 Nov 2008 (12 GW and 10 GR). |
+| 6 | **Kilinochchi** · කිලිනොච්චිය | Nov 2008 – Jan 2009 | Troops broke the earth-bund defences and took the LTTE's administrative centre on 2 Jan 2009. The toppled water tower is in the game. |
+| 7 | **Elephant Pass** · අලිමංකඩ | Jan 2009 | The causeway was retaken on 9 Jan 2009, which reopened the A9 land route to Jaffna. |
+| 8 | **Anandapuram** · ආනන්දපුරම් | Apr 2009 | LTTE units encircled near Anandapuram fought to break out. You hold a junction against counter-attack waves. |
+| 9 | **Puthumathalan** · පුදුමාත්තලන් | 20 Apr 2009 (night) | Troops breached the LTTE bund; very large numbers of civilians crossed over the following days. A night mission with night vision: silence the siren, breach the bund, lead families out. The breach itself is fictionalised. |
+| 10 | **Nandikadal** · නන්දිකඩාල් | May 2009 | You lead civilians out of the combat zone. The war ended on 18–19 May 2009. |
 
 Each mission has a historical briefing and debrief. The campaign ends with an epilogue that remembers everyone who died: soldiers, LTTE cadres and civilians. Civilians are never targets. Aiming at a civilian and killing them fails the mission.
 
@@ -23,13 +27,13 @@ Each mission has a historical briefing and debrief. The campaign ends with an ep
 
 ## Story campaign
 
-You play **Awan**, a fictional officer who starts as a Second Lieutenant. He leads his section — Sgt. Ruwan, Cpl. Nimal, L/Cpl. Kasun, Pte. Prakash — from Mavil Aru (2006) to Nandikadal (2009).
+You play **Awan**, a fictional officer who starts as a Second Lieutenant. He leads his section — Sgt. Ruwan, Cpl. Nimal, L/Cpl. Kasun, Pte. Prakash — through ten missions, from Mavil Aru (2006) to Nandikadal (2009).
 
-- **Prologue cinematic.** Rain and thunder, a map of Sri Lanka with the six operations, a fly-over that introduces the squad, then the title. You can skip it with the button, Esc, Space or Enter.
+- **Prologue cinematic.** Rain and thunder, a map of Sri Lanka with the ten operations, a fly-over that introduces the squad, then the title. You can skip it with the button, Esc, Space or Enter.
 - **Radio dialogue.** Every mission has spoken lines (as subtitles) at the start, for each objective, for events like first contact or being wounded, and at the end.
 - **Briefings and debriefs** keep the **Historical record** and the **Your section — fiction** text clearly apart.
 - **XP, ranks and commendations.** The ranks are Second Lieutenant → Lieutenant → Captain → Major. Only your best result per mission counts, so replaying never doubles XP. When you are promoted, the squad celebrates with kiribath and tea.
-- **Menus:** Continue Campaign, New Campaign, Mission Selection, Squad, Player Profile (with reset), Historical Archive (timeline, human cost, sources), Settings (sensitivity, volume, difficulty, graphics) and Credits. Loadout and multiplayer are shown as *planned* and disabled.
+- **Menus:** Continue Campaign, New Campaign, Mission Selection, Squad, Player Profile (with reset), Historical Archive (timeline, human cost, sources), Settings (sensitivity, volume, difficulty, graphics), Loadout, Co-op and Credits.
 - **Epilogue:** a historical timeline, the human cost on every side, where the fictional squad ended up, and a message of remembrance.
 
 ## Tactical gameplay
@@ -42,7 +46,28 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **Binoculars (B):** look at a hostile to mark him on the HUD and the map.
 - **Tactical map (M):** shows the terrain, buildings, towers, alarms, supplies, your squad and marked hostiles.
 - **Squad orders:** T makes the squad follow or hold. V sends Bravo team to the point you are aiming at, so the team can split and flank. X sets weapons free or tight. While weapons are tight, allies fire only once the enemy is alerted. They copy your stance so they don't give you away. Kasun is a marksman in a ghillie suit.
+- **Squad roles:**
+  - **Prakash, the medic,** runs to whoever is badly wounded, with you first. Press H to call him. He has six field dressings per mission, and a supply crate tops them up to at least three. Without a medic, your wounds heal only to 60%. A crate's first-aid kit takes you to 80%.
+  - **Nimal, the support gunner,** carries a machine gun. His long bursts suppress cadres, and so do your own rounds landing close to them. A suppressed cadre ducks and fires far less accurately.
+  - **Cover and flanking:** in a fight, cadres and your section look for a spot behind sandbags, bunkers, rocks, trees or buildings that blocks the enemy's line of sight. They crouch there and rise to shoot. Some cadres work round the side, and a squadmate calls it out ("They're flanking — left side!").
+- **Loadout:** choose your gear from the menu or the briefing. Some items unlock by rank:
+  - **Primary weapon:** T-56 rifle, or a light machine gun with a 100-round belt (Lieutenant). The machine gun makes you slower and takes longer to reload.
+  - **Equipment:** three grenades, extra magazines (+50% ammunition, Lieutenant), or a pouch of five grenades (Captain).
+  - **Night-vision goggles** (Captain), toggled with N. They are always issued for night missions, and cadres see much less in the dark.
+  - Locked items fall back to standard issue.
+- **New objective type, *hold*:** stay inside the marked position until the timer runs out while counter-attack waves arrive from different directions.
 - **Insertion scenes:** the squad arrives by Bell 212-style helicopter (Thoppigala, Elephant Pass), by Navy Arrow boat onto the Pooneryn beach, or by Buffel APC. You can skip them with Space.
+
+## Co-op (2 players)
+
+Choose **Co-op** in the main menu, then **Host a game**, and send the invite link to a friend. When they open it, the two browsers connect directly over WebRTC. The public PeerJS server is used only to introduce them. The host picks any mission they have unlocked and starts it.
+
+- The host's game runs the mission: AI, objectives, civilians and damage. The guest moves and shoots their own soldier.
+- The guest's hits, grenades, alarm sabotage and charges are sent to the host, who applies them. The host sends the state of every unit about 15 times a second.
+- Both players earn XP. If either player is killed, the mission fails.
+- If the guest disconnects, the host carries on alone. If the host disconnects, the guest's mission ends.
+- Insertion cinematics are skipped in co-op.
+- Limitations: there is no relay (TURN) server, so some strict corporate or mobile networks can block the direct connection. Only two players are supported.
 
 ## Environment and presentation
 
@@ -74,13 +99,17 @@ The full design and roadmap (new missions, squad orders, weapons, co-op with inv
 
 ```bash
 npx playwright install chromium   # once
-npm run test:campaign             # a bot plays all six missions in headless Chromium
+npm run test:campaign             # a bot plays all ten missions in headless Chromium
 npm run test:campaign -- 0 3      # only missions 1 and 4
 ```
 
 `node tests/shots.mjs <dir> [low|medium|high] [mission indices]` saves a gameplay screenshot of each mission and prints draw calls and triangles (run `npm run build` first).
 
-The test checks the start screen, prologue skip, every menu screen, each mission's completion, debrief XP, the promotions, the epilogue, saving across a reload, and that there are no page errors.
+`npm run test:coop` runs a local PeerServer and connects two headless browser pages. It checks the invite link, the mission start, unit and position sync, the guest's hits, objective progress, mission completion and XP for the guest, and a disconnect.
+
+`npm run build && npm run test:systems` checks the medic, natural healing to 60%, suppression, the gunner's machine gun, cover search, rank-locked loadout items, the machine gun and grenade pouch, night vision and the loadout screen.
+
+The campaign test checks the start screen, prologue skip, every menu screen, each mission's completion, debrief XP, the promotions, the epilogue, saving across a reload, and that there are no page errors.
 
 ## Two versions
 
@@ -140,11 +169,12 @@ blender/build_assets.py   Blender model builder
 blender/models/           editable .blend files
 public/models/            exported .glb models
 src/main.js               game loop, player, camera, objectives, HUD
-src/missions.js           the six missions: history text, maps, objectives
+src/missions.js           the ten missions: history text, maps, objectives
 src/world.js              terrain shader, sky, water, props, grass, collision and ray casts
 src/atmosphere.js         per-mission lighting, fog, weather and colour grade
 src/weather.js            rain, mist, dust, smoke and lightning
 src/postfx.js             MSAA, bloom, tone mapping and colour grade
+src/net.js                two-player co-op over WebRTC (PeerJS)
 src/units.js              soldiers and civilians: animation and AI
 src/fx.js, src/audio.js   effects and procedural sound
 src/input.js              keyboard, mouse and touch controls

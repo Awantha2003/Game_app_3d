@@ -56,13 +56,119 @@ export const MISSIONS = [
       w.prop('house_ruined', 8, -70, 0.3);
       w.prop('supplies', 0, -10, 0.5);
       w.enemies(8, 18, -52, 14, 'gate');
-      w.target('gate', 31, -50, { label: 'Sluice gate controls', time: 3 });
+      w.target('gate', 31, -50, { label: 'Sluice gate controls', time: 3, doneText: 'The sluice gates are open — water is flowing to the paddy fields again' });
     },
     objectives: [
       { type: 'clear', tag: 'outpost', text: 'Clear the LTTE outpost in the paddy fields' },
       { type: 'reach', pos: [20, -30], r: 12, text: 'Advance to the Mavil Aru anicut' },
       { type: 'clear', tag: 'gate', text: 'Secure the anicut', spawn: [{ x: 10, z: -90, n: 3, tag: 'gate' }] },
       { type: 'interact', tag: 'gate', text: 'Open the sluice gates' },
+    ],
+  },
+
+  {
+    id: 'sampur',
+    name: 'Sampur',
+    si: 'සාම්පූර්',
+    date: 'August – September 2006',
+    place: 'Trincomalee District, south of Koddiyar Bay',
+    briefing: [
+      'From Sampur, on the southern shore of Koddiyar Bay, LTTE artillery could reach Trincomalee harbour and the naval base across the water.',
+      'In late August 2006, after LTTE attacks around Muttur, the army launched an operation to take the Sampur area.',
+      'Troops entered Sampur on 4 September 2006. It was the first significant territory taken from the LTTE in Eelam War IV.',
+    ],
+    debrief: 'Sampur was captured on 4 September 2006, removing the artillery threat to Trincomalee harbour. The army next turned south towards Vakarai.',
+    world: {
+      size: 120,
+      ground: ['#8a8a4a', '#9a9455'],
+      sky: '#b0c8dc', fog: ['#cfd2c6', 40, 250], water: -0.4,
+      height: (x, z) => {
+        const shore = 58 + Math.sin(z * 0.04) * 8;
+        return -2.5 + smooth(shore + 6, shore - 6, x) * (3 + fbm(x * 0.03, z * 0.03) * 2.2);
+      },
+    },
+    player: { x: -30, z: 100 },
+    allies: 3,
+    insertion: 'apc',
+    layout(w) {
+      w.scatter('palm_palmyrah', 60, { x0: -118, x1: 50, z0: -118, z1: 118 }, { avoid: [[-30, 100, 14], [-5, 40, 16], [-2, -25, 22], [0, -80, 18]] });
+      w.scatter('palm_coconut', 35, { x0: -60, x1: 55, z0: -118, z1: -40 }, { avoid: [[0, -80, 14]] });
+      w.scatter('bush', 140, { x0: -118, x1: 50, z0: -118, z1: 118 }, { avoid: [[-30, 100, 8]] });
+      w.scatter('rock_small', 14, { x0: -110, x1: 40, z0: -100, z1: 100 }, { avoid: [[-30, 100, 10]] });
+      w.prop('buffel', -22, 110, 0.1); w.prop('supplies', -36, 104, 0);
+      // forward bunker line
+      w.prop('bunker', -14, 40, 0.2); w.prop('bunker', 8, 36, 1.4);
+      w.prop('sandbag_wall', -4, 44, 0); w.prop('sandbag_wall', 18, 42, 0.3);
+      w.tower(-26, 34, 0.3, 'line');
+      w.enemies(7, -4, 36, 16, 'line');
+      // the gun line that shelled the harbour
+      w.prop('supplies', -18, 8, 0.4);
+      w.prop('sandbag_wall', -10, -14, 0.1); w.prop('bunker', 14, -16, 2.0);
+      w.alarm(0, -8, 0.4, 'guns');
+      w.enemies(7, -2, -24, 14, 'guns');
+      w.target('guns', -14, -26, { model: 'artillery', rot: Math.PI + 0.3, label: 'Field gun', time: 3, plant: true });
+      w.target('guns', 12, -30, { model: 'artillery', rot: Math.PI - 0.2, label: 'Field gun', time: 3, plant: true });
+      // Sampur village
+      for (const [x, z, r] of [[-14, -74, 0.2], [8, -78, 1.4], [-4, -92, 2.6], [18, -94, 0.6]]) w.prop('hut', x, z, r);
+      w.prop('house_ruined', -24, -88, 1.1); w.prop('sandbag_wall', 2, -66, 0);
+      w.enemies(6, 0, -84, 14, 'village');
+    },
+    objectives: [
+      { type: 'clear', tag: 'line', text: 'Break through the forward bunker line' },
+      { type: 'clear', tag: 'guns', text: 'Clear the gun line' },
+      { type: 'interact', tag: 'guns', text: 'Plant charges on the field guns' },
+      { type: 'clear', tag: 'village', text: 'Secure Sampur', spawn: [{ x: 10, z: -110, n: 3, tag: 'village' }] },
+    ],
+  },
+
+  {
+    id: 'vakarai',
+    name: 'Vakarai',
+    si: 'වාකරේ',
+    date: 'January 2007',
+    place: 'Batticaloa District, Eastern Province',
+    briefing: [
+      'Vakarai, a coastal town north of Batticaloa between the lagoon and the sea, was the main LTTE-held area left in the East at the end of 2006.',
+      'As the army closed in, tens of thousands of civilians left the area for government-held territory, many of them crossing the lagoon.',
+      'Troops took Vakarai on 19 January 2007.',
+    ],
+    debrief: 'Vakarai was captured on 19 January 2007. The remaining LTTE fighters in the East withdrew into the jungles around Thoppigala.',
+    world: {
+      size: 120,
+      ground: ['#5f7d2e', '#738f38'],
+      sky: '#a9c4d4', fog: ['#b8c8c4', 30, 220], water: -0.4,
+      height: (x, z) => {
+        const lagoon = -45 + Math.sin(z * 0.05) * 8;
+        return -2.5 + smooth(lagoon - 6, lagoon + 6, x) * (3 + fbm(x * 0.04, z * 0.04) * 1.2);
+      },
+    },
+    player: { x: -32, z: 96 },
+    allies: 4,
+    insertion: 'boat',
+    layout(w) {
+      w.scatter('tree_rain2', 70, { x0: -60, x1: 118, z0: -118, z1: 118 }, { avoid: [[-32, 96, 14], [0, 45, 14], [6, -6, 22], [18, -82, 16]] });
+      w.scatter('palm_coconut', 60, { x0: -50, x1: 118, z0: -118, z1: 118 }, { avoid: [[-32, 96, 12], [6, -6, 18], [18, -82, 14]] });
+      w.scatter('bush', 150, { x0: -55, x1: 118, z0: -118, z1: 118 }, { avoid: [[-32, 96, 8]] });
+      w.prop('supplies', -24, 100, 0.3);
+      // fighters on the lagoon shore
+      w.prop('bunker', -8, 44, 0.4); w.prop('sandbag_wall', 6, 48, 0.2); w.prop('fallen_log', -18, 52, 0.9);
+      w.enemies(6, 0, 42, 14, 'shore');
+      // the village where families are sheltering
+      for (const [x, z, r] of [[-6, -2, 0.3], [14, 4, 1.2], [20, -14, 2.2], [-2, -18, 0.8]]) w.prop('hut', x, z, r);
+      w.prop('house_ruined', 30, 0, 1.6);
+      w.civilians(10, 6, -8, 5);
+      w.enemies(6, 6, -28, 14, 'village');
+      w.prop('supplies', -14, 12, 1);
+      // the last position south of the town
+      w.prop('bunker', 10, -82, 0.1); w.prop('bunker', 28, -86, 1.9); w.prop('sandbag_wall', 18, -74, 0);
+      w.tower(36, -70, 0.4, 'last');
+      w.enemies(6, 18, -84, 14, 'last');
+    },
+    objectives: [
+      { type: 'clear', tag: 'shore', text: 'Clear the fighters on the lagoon shore' },
+      { type: 'clear', tag: 'village', text: 'Clear the fighters around the village' },
+      { type: 'escort', zone: [-30, 92, 12], text: 'Lead the families to the boats', reach: [6, -8] },
+      { type: 'clear', tag: 'last', text: 'Clear the last position south of Vakarai' },
     ],
   },
 
@@ -268,6 +374,105 @@ export const MISSIONS = [
       { type: 'clear', tag: 'south', text: 'Break through the LTTE line on the causeway' },
       { type: 'clear', tag: 'base', text: 'Recapture the old Elephant Pass base' },
       { type: 'reach', pos: [2, -104], r: 10, text: 'Link up with the 53 Division' },
+    ],
+  },
+
+  {
+    id: 'anandapuram',
+    name: 'Anandapuram',
+    si: 'ආනන්දපුරම්',
+    date: 'April 2009',
+    place: 'Puthukkudiyiruppu, Mullaitivu District',
+    briefing: [
+      'By the end of March 2009 the army had pushed the LTTE back towards the coast around Puthukkudiyiruppu.',
+      'In the first days of April, LTTE units were encircled near the village of Anandapuram and fought hard to break out. Both sides suffered heavy losses.',
+      'The army reported that several senior LTTE commanders were killed in the battle, which broke much of the LTTE\'s remaining conventional fighting strength.',
+    ],
+    debrief: 'After Anandapuram the LTTE no longer fought as a conventional army. What remained of it withdrew into the coastal strip with a very large number of civilians.',
+    world: {
+      size: 120,
+      ground: ['#7d7a45', '#8c8a4e'],
+      sky: '#b4bcc0', fog: ['#c2bfb2', 30, 210], water: null,
+      height: (x, z) => fbm(x * 0.025, z * 0.025) * 3,
+    },
+    player: { x: 0, z: 102 },
+    allies: 4,
+    shelling: true,
+    insertion: 'apc',
+    layout(w) {
+      w.scatter('palm_coconut', 150, { x0: -118, x1: 118, z0: -118, z1: 118 },
+        { avoid: [[0, 102, 14], [0, 40, 16], [0, -5, 16], [10, -78, 20]] });
+      w.scatter('bush', 120, { x0: -118, x1: 118, z0: -118, z1: 118 }, { avoid: [[0, 102, 8], [0, -5, 12]] });
+      w.prop('buffel', 10, 112, 0); w.prop('supplies', -8, 104, 0);
+      // fighters dug in among the coconut groves
+      w.prop('bunker', -10, 42, 0.3); w.prop('bunker', 12, 38, 1.8); w.prop('house_ruined', 26, 48, 0.9);
+      w.prop('sandbag_wall', 0, 46, 0);
+      w.enemies(7, 0, 40, 16, 'grove');
+      // the junction the section must hold
+      w.prop('sandbag_wall', -6, 2, 0); w.prop('sandbag_wall', 6, -10, Math.PI / 2); w.prop('sandbag_wall', -8, -12, 0.4);
+      w.prop('house_ruined', 12, 6, 0.2); w.prop('supplies', 0, -4, 0);
+      // the encircled positions
+      for (const x of [-50, -28, 28, 50]) w.prop('earth_bund', x, -62, 0); // a gap in the middle of the bund
+      w.prop('bunker', 0, -80, 0.4); w.prop('bunker', 24, -84, 2.2); w.prop('house_ruined', -18, -86, 1.3);
+      w.enemies(7, 6, -80, 16, 'ring');
+    },
+    objectives: [
+      { type: 'clear', tag: 'grove', text: 'Clear the positions in the coconut grove' },
+      { type: 'defend', zone: [0, -4, 12], time: 75, tag: 'counter', text: 'Hold the junction against the break-out',
+        waves: [{ at: 4, x: 60, z: -12, n: 4 }, { at: 28, x: -60, z: 4, n: 4 }, { at: 50, x: 4, z: -50, n: 4 }] },
+      { type: 'clear', tag: 'counter', text: 'Clear the remaining attackers' },
+      { type: 'clear', tag: 'ring', text: 'Take the encircled positions behind the bund', spawn: [{ x: -10, z: -110, n: 3, tag: 'ring' }] },
+    ],
+  },
+
+  {
+    id: 'puthumathalan',
+    name: 'Puthumathalan',
+    si: 'පුදුමාත්තලන්',
+    date: '20 April 2009 · night',
+    place: 'Mullaitivu District, north-east coast',
+    night: true,
+    briefing: [
+      'In April 2009 the LTTE held a narrow coastal strip between the Nandikadal lagoon and the sea. Tens of thousands of civilians were trapped inside it, and an earth bund ran across the strip near Puthumathalan.',
+      'On 20 April 2009 troops breached the bund. Over the next few days very large numbers of civilians crossed to government-held areas — more than 100,000 according to government figures.',
+      'This mission is set on the night before the crossing. The breach here is fictionalised; the crossing that followed is history.',
+    ],
+    debrief: 'The breach at Puthumathalan opened the way for the largest single movement of civilians out of the combat zone. Fighting continued on the strip for another month.',
+    world: {
+      size: 120,
+      ground: ['#a49a6a', '#8c8c4c'],
+      sky: '#0b1018', fog: ['#0d121c', 15, 150], water: -0.4,
+      height: (x, z) => {
+        const shore = 40 + Math.sin(z * 0.05) * 6;
+        return -2.5 + smooth(shore + 6, shore - 6, x) * (3 + fbm(x * 0.04, z * 0.04) * 0.8);
+      },
+    },
+    player: { x: -20, z: 100 },
+    allies: 4,
+    insertion: 'apc',
+    layout(w) {
+      w.scatter('palm_coconut', 80, { x0: -118, x1: 34, z0: -118, z1: 118 }, { avoid: [[-20, 100, 14], [-6, 2, 22], [-10, -50, 14]] });
+      w.scatter('palm_palmyrah', 30, { x0: -118, x1: 20, z0: -118, z1: 118 }, { avoid: [[-20, 100, 14], [-6, 2, 22]] });
+      w.scatter('bush', 140, { x0: -118, x1: 34, z0: -118, z1: 118 }, { avoid: [[-20, 100, 8], [-6, 2, 8]] });
+      w.prop('buffel', -10, 112, 0); w.prop('supplies', -28, 104, 0);
+      // the earth bund across the strip, with a sentry tower and an alarm
+      for (const x of [-118, -98, -78, -58, -38, -21, 15, 33]) w.prop('earth_bund', x, 0, 0);
+      w.tower(-34, -8, 0.2, 'bund');
+      w.alarm(12, 7, 0.3, 'bund'); // the siren stands on the near side of the bund
+      w.prop('bunker', -14, -12, 0.2); w.prop('bunker', 20, -14, 1.6);
+      w.enemies(8, -4, -14, 16, 'bund');
+      w.target('breach', -3, 0, { model: 'earth_bund', label: 'the earth bund', blast: 'The bund is breached', time: 4, plant: true });
+      // families sheltering behind the line
+      w.prop('house_ruined', -20, -46, 0.4); w.prop('hut', 4, -58, 1.2); w.prop('hut', -24, -62, 2.8);
+      w.civilians(10, -10, -52, 6);
+      w.enemies(6, -6, -78, 16, 'camp');
+    },
+    objectives: [
+      { type: 'alarm', tag: 'bund', text: 'Sabotage the alarm on the bund before you are seen' },
+      { type: 'interact', tag: 'breach', text: 'Set the breaching charge on the bund' },
+      { type: 'clear', tag: 'bund', text: 'Clear the fighters at the breach' },
+      { type: 'clear', tag: 'camp', text: 'Clear the fighters south of the families' },
+      { type: 'escort', zone: [-20, 95, 12], text: 'Lead the families through the breach to the army lines', reach: [-10, -52] },
     ],
   },
 

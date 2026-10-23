@@ -7,12 +7,13 @@ import { Input } from './input.js';
 import { MISSIONS } from './missions.js';
 import { Prologue } from './cinematic.js';
 import { Insertion } from './insertion.js';
+import { Net } from './net.js';
 import { PostFX } from './postfx.js';
 import { Weather } from './weather.js';
 import { Profile } from './profile.js';
 import { Radio } from './radio.js';
 import {
-  CHARACTERS, CLOSING, HISTORY_TIMELINE, HUMAN_COST, MEDALS, PROLOGUE, RANKS, SOURCES, SQUAD_EPILOGUE, STORY, nextRank,
+  CHARACTERS, CLOSING, HISTORY_TIMELINE, HUMAN_COST, LOADOUT, MEDALS, PROLOGUE, RANKS, SOURCES, SQUAD_EPILOGUE, STORY, nextRank, rankIndex,
 } from './story.js';
 import { Unit } from './units.js';
 import { World } from './world.js';
@@ -21,6 +22,7 @@ const $ = (s, r = document) => r.querySelector(s);
 
 // The player's weapons. Noise is how far (m) the shot is heard.
 const WEAPONS = [
+  { id: 'lmg', name: 'Light machine gun', mag: 100, reserve: 300, interval: 0.085, auto: true, body: 40, head: 120, spreadHip: 0.026, spreadAim: 0.007, recoil: 0.011, noise: 90, reload: 5.2, heavy: true },
   { id: 't56', name: 'T-56 rifle', mag: 30, reserve: 240, interval: 0.1, auto: true, body: 36, head: 120, spreadHip: 0.012, spreadAim: 0.003, recoil: 0.009, noise: 70, reload: 2.2 },
   { id: 'pistol', name: 'Pistol · suppressed', mag: 8, reserve: 48, interval: 0.25, auto: false, body: 34, head: 110, spreadHip: 0.01, spreadAim: 0.004, recoil: 0.014, noise: 9, reload: 1.6, suppressed: true },
   { id: 'svd', name: 'SVD Dragunov', mag: 10, reserve: 40, interval: 0.45, auto: false, body: 110, head: 200, spreadHip: 0.03, spreadAim: 0.0004, recoil: 0.03, noise: 130, reload: 2.8, scope: true },
@@ -38,6 +40,10 @@ class Game {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 1100);
     this.postfx = new PostFX(this.renderer, this.scene, this.camera);
+    this.net = new Net(this);
+    this.net.onStatus = (t) => { const el = $('.coop-status'); if (el) el.textContent = t; };
+    this.net.onInvite = (link) => { $('.coop-link').value = link; $('.coop-invite').classList.remove('hidden'); };
+    this.net.onConnect = () => this.refreshCoop();
     this.audio = new Audio();
     this.fx = new FX(this.scene);
     this.input = new Input(this.canvas, $('#touch'));
@@ -109,6 +115,7 @@ class Game {
   }
 
   show(name) {
+    if (name && name !== 'pause' && this.nvg) this.setNVG(false);
     const screen = $('#screen');
     screen.classList.toggle('hidden', !name);
     screen.classList.toggle('clear', name === 'pause');
@@ -120,6 +127,14 @@ class Game {
 
   bindUI() {
     $('#screen').addEventListener('click', (e) => {
+      const item = e.target.closest('.lo-item');
+      if (item && !item.disabled) {
+        this.profile.data.loadout[item.dataset.slot] = item.dataset.item;
+        this.profile.save();
+        this.audio.click();
+        this.showLoadout(this.loadoutBack);
+        return;
+      }
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (!act) return;
       this.audio.init();
@@ -129,8 +144,11 @@ class Game {
         begin: () => this.beginMission(),
         menu: () => this.showMenu(),
         resume: () => this.resume(),
-        restart: () => { this.startMission(this.missionIndex); this.beginMission(); },
-        next: () => this.afterDebrief(),
+        restart: () => {
+          if (this.net.active) { if (this.net.role === 'host') this.coopHostStart(this.missionIndex); else this.toast('Only the host can restart the mission'); return; }
+          this.startMission(this.missionIndex); this.beginMission();
+        },
+        next: () => (this.net.active ? this.showCoop() : this.afterDebrief()),
         'promo-next': () => this.nextAfterMission(),
         continue: () => this.continueCampaign(),
         newcampaign: () => this.playPrologue(() => this.openBriefing(0)),
@@ -140,6 +158,14 @@ class Game {
         profile: () => this.showProfile(),
         archive: () => this.showArchive(),
         settings: () => this.showSettings(),
+        loadout: () => this.showLoadout('menu'),
+        coop: () => this.showCoop(),
+        'coop-host': () => { this.net.host(); this.refreshCoop(); },
+        'coop-copy': () => { navigator.clipboard?.writeText($('.coop-link').value).then(() => this.toast('Invite link copied'), () => {}); $('.coop-link').select(); },
+        'coop-start': () => this.coopHostStart(parseInt($('.coop-mission').value, 10)),
+        'coop-leave': () => { this.net.leave(); this.net.setStatus('Not connected.'); $('.coop-invite').classList.add('hidden'); this.refreshCoop(); },
+        'loadout-brief': () => this.showLoadout('briefing'),
+        'loadout-back': () => (this.loadoutBack === 'briefing' ? this.openBriefing(this.missionIndex) : this.showMenu()),
         credits: () => this.show('credits'),
         reset: () => {
           if (window.confirm('Reset all campaign progress, XP and commendations? Settings are kept.')) {
@@ -336,7 +362,7 @@ class Game {
     this.audio.stinger(true);
     this.audio.rain(this.world.atm.weather.rain > 0);
     this.radio.clear();
-    if (this.mission.insertion) {
+    if (this.mission.insertion && !this.net.active) {
       this.insertion = new Insertion(this, this.mission.insertion);
       $('.insert-skip').classList.add('on');
       $('#hud').classList.add('cinema');
@@ -422,7 +448,7 @@ class Game {
     const squad = STORY[m.id].squad;
     for (let k = 0; k < m.allies; k++) {
       const c = squad[k] ? CHARACTERS[squad[k]] : {};
-      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI, name: c.short, model: c.model, role: c.ai });
+      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI, name: c.short, model: c.model, role: c.ai, weapon: c.ai === 'gunner' ? 'wpn_lmg' : null });
       this.units.push(a);
     }
     let idx = 10;
@@ -430,6 +456,20 @@ class Game {
       const u = new Unit(this, s.team, s.x, s.z, { tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI, patrol: s.patrol, sentry: s.sentry });
       if (s.team === 'ltte') u.yaw = Math.atan2(m.player.x - s.x, m.player.z - s.z) + (Math.random() - 0.5) * 1.8;
       this.units.push(u);
+    }
+    // network ids: the same construction order on both machines gives the same ids
+    this.units.forEach((u, i) => { u.nid = i; });
+    this.nextNid = 1000;
+    this.partner = null;
+    if (this.net.active) {
+      this.player.nid = this.net.role === 'host' ? 'H' : 'G';
+      const pt = new Unit(this, 'army', m.player.x + 2, m.player.z + 1.5, { yaw: Math.PI, name: 'Partner', model: 'soldier_army' });
+      pt.remote = true;
+      pt.tag = 'partner';
+      pt.nid = this.net.role === 'host' ? 'G' : 'H';
+      pt.name = this.net.role === 'host' ? 'Partner' : 'Host';
+      this.partner = pt;
+      this.units.push(pt);
     }
     this.world.units = this.units;
     this.escortZone = m.objectives.find((o) => o.type === 'escort')?.zone || [0, 0, 10];
@@ -443,10 +483,7 @@ class Game {
     this.yaw = Math.PI;
     this.pitch = 0;
     this.wi = 0;
-    this.wstate = WEAPONS.map((w) => ({ ammo: w.mag, reserve: w.reserve }));
-    this.ammo = WEAPONS[0].mag;
-    this.reserve = WEAPONS[0].reserve;
-    this.grenades = 3;
+    this.applyLoadout();
     this.projectiles = [];
     this.binos = false;
     this.breath = 1;
@@ -509,20 +546,25 @@ class Game {
     this.objIndex = i;
     const o = this.currentObjective();
     if (!o) return;
-    for (const s of o.spawn || []) {
-      for (let k = 0; k < s.n; k++) {
-        const x = s.x + (Math.random() - 0.5) * 10, z = s.z + (Math.random() - 0.5) * 10;
-        if (this.world.isWater(x, z, 0)) continue;
-        const u = new Unit(this, 'ltte', x, z, { tag: s.tag, index: 50 + k });
-        u.state = 'combat';
-        u.lastSeen = this.player.pos.clone();
-        this.units.push(u);
-      }
-    }
+    if (o.type === 'defend') this.defendState = { left: o.time, elapsed: 0, wave: 0 };
+    if (this.net.role !== 'guest' || !this.net.active) for (const s of o.spawn || []) this.spawnGroup(s);
     $('.obj-mission').textContent = `${this.profile.rank.short} Awan · ${this.mission.name} · Objective ${i + 1}/${this.mission.objectives.length}`;
     $('.obj-text').textContent = o.text;
     if (i > 0) this.toast(`New objective: ${o.text}`);
     this.radio.say(STORY[this.mission.id].objectives[i]);
+  }
+
+  // reinforcements that arrive already fighting
+  spawnGroup(s) {
+    for (let k = 0; k < s.n; k++) {
+      const x = s.x + (Math.random() - 0.5) * 10, z = s.z + (Math.random() - 0.5) * 10;
+      if (this.world.isWater(x, z, 0)) continue;
+      const u = new Unit(this, 'ltte', x, z, { tag: s.tag, index: 50 + k });
+      u.nid = this.nextNid++;
+      u.state = 'combat';
+      u.lastSeen = this.player.pos.clone();
+      this.units.push(u);
+    }
   }
 
   checkObjective() {
@@ -552,6 +594,20 @@ class Game {
       const alarms = this.world.alarms.filter((a) => a.tag === o.tag);
       if (alarms.some((a) => a.triggered && !a.disabled)) { done = true; this.toast('The alarm was raised — fight your way through!'); }
       else done = alarms.every((a) => a.disabled);
+    } else if (o.type === 'defend') {
+      // hold the position while counter-attack waves come in
+      const st = this.defendState, [zx, zz, zr] = o.zone;
+      st.elapsed += this.frameDt || 0;
+      const w = o.waves[st.wave];
+      if (w && st.elapsed >= w.at) {
+        this.spawnGroup({ ...w, tag: o.tag });
+        st.wave++;
+        this.radio.say([[this.speakerKey(this.squadAllies()[0]), st.wave === 1 ? 'Here they come — hold the junction!' : 'More of them — another direction!']]);
+      }
+      const inside = Math.hypot(this.player.pos.x - zx, this.player.pos.z - zz) < zr;
+      if (inside) st.left -= this.frameDt || 0;
+      sub = inside ? `Hold the position: ${Math.max(0, Math.ceil(st.left))} s` : 'Get back to the position!';
+      done = st.left <= 0;
     } else if (o.type === 'escort') {
       const waiting = this.units.filter((u) => u.team === 'civ' && u.state === 'wait').length;
       sub = waiting ? `Reach the civilians (${waiting} waiting)` : `Civilians safe: ${this.civSafe} / ${this.civTotal}`;
@@ -586,6 +642,7 @@ class Game {
       const a = this.world.alarms.find((a) => a.tag === o.tag && !a.disabled);
       return a ? new THREE.Vector3(a.x, a.y + 3.5, a.z) : null;
     }
+    if (o.type === 'defend') return new THREE.Vector3(o.zone[0], this.world.height(o.zone[0], o.zone[1]) + 2, o.zone[1]);
     if (o.type === 'escort') {
       const waiting = this.units.find((u) => u.team === 'civ' && u.state === 'wait');
       if (waiting) return waiting.pos.clone().setY(waiting.pos.y + 2);
@@ -595,6 +652,7 @@ class Game {
   }
 
   missionComplete() {
+    if (this.net.active && this.net.role === 'host') this.net.send({ t: 'end', ok: true });
     this.radio.say(STORY[this.mission.id].outro);
     this.endTimer = Math.min(10, Math.max(2.5, this.radio.remaining + 0.6));
     // outro shot: the camera pulls away from the section while the radio plays
@@ -612,6 +670,7 @@ class Game {
       const rec = this.profile.recordMission(this.missionIndex, {
         objectives: m.objectives.length, accuracy: acc, difficulty: this.difficulty,
         hasCivilians: this.civTotal > 0, civilianIncidents: this.civIncidents,
+        alarmRaised: this.world.alarms.some((a) => a.triggered && !a.disabled),
       });
       this.lastRecord = rec;
       this.audio.siren(false);
@@ -646,6 +705,7 @@ class Game {
 
   nextAfterMission() {
     this.stopConfetti = true;
+    if (this.net.active) { this.showCoop(); return; }
     if (this.missionIndex + 1 < MISSIONS.length) this.openBriefing(this.missionIndex + 1);
     else this.showEpilogue();
   }
@@ -697,6 +757,7 @@ class Game {
 
   missionFailed(reason) {
     if (this.endTimer > 0) return;
+    if (this.net.active && this.net.role === 'host') this.net.send({ t: 'end', ok: false, reason });
     this.endTimer = 2;
     this.endAction = () => {
       this.audio.siren(false);
@@ -711,7 +772,12 @@ class Game {
   // ------------------------------------------------------------ events
 
   onUnitKilled(u) {
-    if (u.isPlayer) { this.radio.clear(); this.missionFailed('You were killed in action.'); return; }
+    if (u.isPlayer) {
+      this.radio.clear();
+      if (this.net.active && this.net.role === 'guest') this.net.send({ t: 'dead' });
+      this.missionFailed('You were killed in action.');
+      return;
+    }
     if (u.team === 'civ') { this.missionFailed('A civilian was killed. Protecting civilians is your first duty.'); return; }
     if (u.team === 'ltte') {
       this.killfeed('LTTE cadre neutralised');
@@ -730,6 +796,43 @@ class Game {
     if (this.flags[name]) return;
     this.flags[name] = true;
     this.radio.say(STORY[this.mission.id].events?.[name]);
+  }
+
+  // rounds landing near cadres pin them down
+  suppress(point, radius, time) {
+    for (const u of this.units) {
+      if (!u.alive || u.team !== 'ltte') continue;
+      if (Math.abs(u.pos.x - point.x) > radius || Math.abs(u.pos.z - point.z) > radius) continue;
+      if (u.pos.distanceTo(point) < radius) u.suppressed = Math.max(u.suppressed, time);
+    }
+  }
+
+  onFlank(u) {
+    if (this.time - (this.lastFlankCall || -99) < 25) return;
+    const pl = this.player.pos;
+    const side = Math.sin(this.yaw) * (u.pos.z - pl.z) - Math.cos(this.yaw) * (u.pos.x - pl.x) > 0 ? 'left' : 'right';
+    const spotter = this.squadAllies().find((a) => a.canSee(u, 120));
+    if (!spotter) return;
+    this.lastFlankCall = this.time;
+    this.radio.say([[this.speakerKey(spotter), `They're flanking — ${side} side!`]]);
+  }
+
+  callMedic() {
+    const medic = this.squadAllies().find((a) => a.role === 'medic');
+    if (!medic) { this.toast('No medic with the section — find a supply crate'); return; }
+    if (medic.kits <= 0) { this.radio.say([[this.speakerKey(medic), 'I\'m out of dressings, Sir.']]); return; }
+    this.medicCalled = true;
+    medic.patient = null;
+    this.radio.say([[this.speakerKey(medic), 'Coming, Sir — stay down!']]);
+  }
+
+  onMedic(medic, patient, phase) {
+    const who = this.speakerKey(medic);
+    if (phase === 'coming' && patient.isPlayer && !this.medicCalled) this.radio.say([[who, 'Hold on, Sir, I\'m coming to you.']]);
+    if (phase === 'done') {
+      if (patient.isPlayer) this.medicCalled = false;
+      this.toast(`${medic.name} treated ${patient.isPlayer ? 'you' : patient.name} · ${medic.kits} dressings left`);
+    }
   }
 
   onPlayerHit(from) {
@@ -797,7 +900,7 @@ class Game {
   // ------------------------------------------------------------ weapons
 
   get W() {
-    return WEAPONS[this.wi];
+    return this.weapons[this.wi];
   }
 
   equipVisuals() {
@@ -810,7 +913,7 @@ class Game {
       rifle.parent.add(o);
       return o;
     };
-    this.weaponObjs = { t56: rifle, svd: attach('wpn_svd'), pistol: attach('wpn_pistol') };
+    this.weaponObjs = { t56: rifle, lmg: attach('wpn_lmg'), svd: attach('wpn_svd'), pistol: attach('wpn_pistol') };
     this.weaponObjs.pistol.position.set(-0.26, -0.3, 0.17);
     this.showWeapon();
   }
@@ -822,7 +925,7 @@ class Game {
   }
 
   switchWeapon(i) {
-    if (i === this.wi || i < 0 || i >= WEAPONS.length) return;
+    if (i === this.wi || i < 0 || i >= this.weapons.length) return;
     this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
     this.wi = i;
     ({ ammo: this.ammo, reserve: this.reserve } = this.wstate[i]);
@@ -835,9 +938,67 @@ class Game {
 
   resupply() {
     this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
-    WEAPONS.forEach((w, i) => { this.wstate[i].reserve = w.reserve; });
+    this.weapons.forEach((w, i) => { this.wstate[i].reserve = w.reserve; });
     this.reserve = this.W.reserve;
-    this.grenades = 3;
+    this.grenades = Math.max(this.grenades, this.maxGrenades);
+    // the crate's first-aid kit
+    this.player.hp = Math.max(this.player.hp, 80);
+    for (const a of this.squadAllies()) if (a.role === 'medic') a.kits = Math.max(a.kits, 3);
+  }
+
+  // weapons and equipment from the player's loadout (locked items fall back to standard issue)
+  applyLoadout() {
+    const lo = this.loadoutChoice();
+    const mags = lo.gear === 'mags' ? 1.5 : 1;
+    const byId = (id) => ({ ...WEAPONS.find((w) => w.id === id) });
+    this.weapons = [byId(lo.primary), byId('pistol'), byId('svd')].map((w) => ({ ...w, reserve: Math.round(w.reserve * mags) }));
+    this.wstate = this.weapons.map((w) => ({ ammo: w.mag, reserve: w.reserve }));
+    this.ammo = this.weapons[0].mag;
+    this.reserve = this.weapons[0].reserve;
+    this.maxGrenades = lo.gear === 'pouch' ? 5 : 3;
+    this.grenades = this.maxGrenades;
+    this.hasNVG = !!this.mission.night || lo.optics === 'nvg';
+    this.setNVG(false);
+  }
+
+  unlocked(item) {
+    return rankIndex(this.profile.rank.id) >= rankIndex(item.rank);
+  }
+
+  loadoutChoice() {
+    const out = {};
+    for (const [slot, items] of Object.entries(LOADOUT)) {
+      const it = items.find((o) => o.id === this.profile.data.loadout[slot]);
+      out[slot] = it && this.unlocked(it) ? it.id : items[0].id;
+    }
+    return out;
+  }
+
+  showLoadout(back = 'menu') {
+    this.loadoutBack = back;
+    const lo = this.loadoutChoice();
+    const titles = { primary: 'Primary weapon', gear: 'Equipment', optics: 'Optics' };
+    $('.loadout').innerHTML = Object.entries(LOADOUT).map(([slot, items]) => `<h3>${titles[slot]}</h3><div class="lo-row">${items.map((it) => {
+      const ok = this.unlocked(it), on = lo[slot] === it.id;
+      const rank = RANKS.find((r) => r.id === it.rank);
+      return `<button class="lo-item${on ? ' on' : ''}" data-slot="${slot}" data-item="${it.id}"${ok ? '' : ' disabled'}>
+        <b>${it.name}</b><small>${ok ? it.desc : `Unlocks at ${rank.name}`}</small></button>`;
+    }).join('')}</div>`).join('')
+      + '<p class="note">Always carried: suppressed pistol (2), SVD sniper rifle (3), binoculars (B).</p>';
+    this.show('loadout');
+    this.focusFirst();
+  }
+
+  toggleNVG() {
+    if (!this.hasNVG) { this.toast('No night-vision goggles in your loadout'); return; }
+    this.setNVG(!this.nvg);
+    this.audio.click();
+  }
+
+  setNVG(on) {
+    this.nvg = on;
+    document.body.classList.toggle('nvg', on);
+    this.renderer.toneMappingExposure = (this.world?.atm.exposure ?? 1) * (on ? 3.2 : 1);
   }
 
   isScoped() {
@@ -866,6 +1027,7 @@ class Game {
     const sprint = inp.sprint && mv.y > 0 && !inp.aim && this.reloading <= 0 && p.stance === 'stand' && !this.binos;
     let speed = p.stance === 'prone' ? 0.9 : p.stance === 'crouch' ? 2.2 : sprint ? 6.8 : 4.3;
     if (inp.aim || this.binos) speed = Math.min(speed, p.stance === 'stand' ? 2.4 : speed * 0.7);
+    if (this.W.heavy) speed *= 0.86;
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const rx = -Math.cos(this.yaw), rz = Math.sin(this.yaw);
     const sx = p.pos.x, sz = p.pos.z;
@@ -888,15 +1050,17 @@ class Game {
     if (scoped && inp.sprint) this.breath = Math.max(0, this.breath - dt / 4);
     else this.breath = Math.min(1, this.breath + dt / 6);
 
-    // health regeneration
-    if (this.time - this.lastPlayerHit > 5) p.hp = Math.min(100, p.hp + 9 * dt);
+    // health: wounds slowly close up to 60%; above that it takes the medic
+    if (this.time - this.lastPlayerHit > 5 && p.hp < 60) p.hp = Math.min(60, p.hp + 9 * dt);
+    if (inp.hit('KeyH')) this.callMedic();
 
     // weapons
     if (inp.hit('Digit1')) this.switchWeapon(0);
     if (inp.hit('Digit2')) this.switchWeapon(1);
     if (inp.hit('Digit3')) this.switchWeapon(2);
     const wheel = inp.consumeWheel();
-    if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : WEAPONS.length - 1)) % WEAPONS.length);
+    if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : this.weapons.length - 1)) % this.weapons.length);
+    if (inp.hit('KeyN')) this.toggleNVG();
     if (inp.hit('KeyB')) { this.binos = !this.binos; this.audio.click(); }
     if (inp.hit('KeyG') && this.grenades > 0 && !this.binos) this.throwGrenade();
 
@@ -934,11 +1098,11 @@ class Game {
     // resupply
     this.supplyCooldown -= dt;
     for (const s of this.world.supplies) {
-      const low = this.reserve < W.reserve || this.grenades < 3;
+      const low = this.reserve < W.reserve || this.grenades < this.maxGrenades || p.hp < 80;
       if (Math.hypot(s.x - p.pos.x, s.z - p.pos.z) < 3 && low && this.supplyCooldown <= 0) {
         this.resupply();
         this.supplyCooldown = 3;
-        this.toast('Ammunition and grenades resupplied');
+        this.toast('Ammunition, grenades and first aid resupplied');
       }
     }
 
@@ -975,7 +1139,19 @@ class Game {
     this.audio.weapon(W.id);
     this.noise(p.pos, W.noise, true);
 
-    if (res?.kind === 'unit') {
+    const guest = this.net.active && this.net.role === 'guest';
+    if (this.net.active) {
+      const v = (x) => x.toArray().map((n) => Math.round(n * 100) / 100);
+      this.net.send(guest ? { t: 'shot', a: v(muzzle), b: v(end), noise: W.noise, quiet: !!W.suppressed } : { t: 'fx', a: v(muzzle), b: v(end), c: 0xfff2a0 });
+    }
+    this.suppress(end, W.id === 'lmg' ? 4 : 2.5, W.id === 'lmg' ? 2.5 : 1.2);
+    if (guest && res?.kind === 'unit' && res.unit.team !== 'army') {
+      // the host owns every unit: report the hit and let it apply the damage
+      const u = res.unit, aimed = this.world.raycast(origin, aimDir, 450, p)?.unit === u;
+      this.net.send({ t: 'hit', nid: u.nid, dmg: res.head ? W.head : W.body, aimed });
+      if (u.team === 'civ') { this.toast('HOLD FIRE — civilians!', true); this.civIncidents++; this.storyEvent('civilianWarning'); }
+      else { this.hits++; this.fx.hitPuff(res.point); this.flashHitmarker(false); }
+    } else if (res?.kind === 'unit') {
       const u = res.unit;
       if (u.team === 'army') {
         this.toast('Check your fire — friendly!');
@@ -1041,6 +1217,15 @@ class Game {
   }
 
   explode(pos, radius, damage, source) {
+    if (this.net.active) {
+      if (this.net.role === 'guest' && source === this.player) {
+        this.fx.explosion(pos);
+        this.audio.explosion(pos);
+        this.net.send({ t: 'boom', p: pos.toArray() });
+        return;
+      }
+      this.net.send({ t: 'boom', p: pos.toArray() });
+    }
     this.fx.explosion(pos);
     this.audio.explosion(pos);
     this.fx.shake = Math.max(this.fx.shake, 1.2 - pos.distanceTo(this.player.pos) / 40);
@@ -1054,6 +1239,7 @@ class Game {
       if (u.isPlayer) this.onPlayerHit(pos);
       if (source === this.player && u.team === 'ltte' && !u.alive) this.kills++;
     }
+    this.suppress(pos, radius * 1.6, 4);
     this.noise(pos, 120, true);
   }
 
@@ -1074,7 +1260,106 @@ class Game {
   // ------------------------------------------------------------ squad orders
 
   squadAllies() {
-    return this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup' && u.alive);
+    return this.units.filter((u) => u.team === 'army' && !u.isPlayer && !u.remote && u.tag !== 'linkup' && u.alive);
+  }
+
+  // ------------------------------------------------------------ co-op
+
+  nearestHuman(pos) {
+    const p = this.player;
+    if (!this.partner || !this.partner.alive) return p;
+    return this.partner.pos.distanceTo(pos) < p.pos.distanceTo(pos) || !p.alive ? this.partner : p;
+  }
+
+  showCoop() {
+    this.state = 'menu';
+    if (document.pointerLockElement) document.exitPointerLock();
+    if (!this.net.status) this.net.setStatus('Not connected. Host a game, or open an invite link from a friend.');
+    else this.net.onStatus(this.net.status);
+    this.refreshCoop();
+    this.show('coop');
+  }
+
+  refreshCoop() {
+    const host = this.net.role === 'host';
+    $('.coop-host-controls').classList.toggle('hidden', !(host && this.net.connected));
+    $('[data-act="coop-host"]').classList.toggle('hidden', !!this.net.role);
+    $('.coop-mission').innerHTML = MISSIONS.map((m, i) => (i <= this.profile.data.unlocked ? `<option value="${i}">${i + 1}. ${m.name} — ${m.date}</option>` : '')).join('');
+  }
+
+  coopHostStart(i) {
+    if (!this.net.active) return;
+    this.startMission(i);
+    this.net.send({ t: 'start', mission: i });
+    this.beginMission();
+  }
+
+  coopStart(i) {
+    this.audio.init();
+    this.startMission(i);
+    this.beginMission();
+  }
+
+  unitByNid(nid) {
+    if (nid === this.player.nid) return null;
+    return this.units.find((u) => u.nid === nid) || null;
+  }
+
+  // guest: a unit the host created after the mission began (reinforcements)
+  spawnRemote(nid, team, x, z, tag) {
+    if (typeof nid !== 'number') return null;
+    const u = new Unit(this, team, x, z, { tag, index: 50 });
+    u.nid = nid;
+    this.units.push(u);
+    return u;
+  }
+
+  partnerShot(m) {
+    const a = new THREE.Vector3(...m.a), b = new THREE.Vector3(...m.b);
+    if (!m.quiet || Math.random() < 0.3) this.fx.tracer(a, b);
+    this.audio.shot(a, false);
+    if (this.partner) this.noise(this.partner.pos, m.noise, true);
+    this.suppress(b, 2.5, 1.2);
+  }
+
+  partnerHit(m) {
+    const u = this.units.find((x) => x.nid === m.nid);
+    if (!u || !u.alive) return;
+    if (u.team === 'civ') {
+      if (m.aimed) u.damage(40, this.partner);
+      this.civIncidents++;
+      this.net.send({ t: 'toast', text: 'HOLD FIRE — civilians!', big: true });
+      return;
+    }
+    u.damage(m.dmg, this.partner);
+    if (!u.alive && u.team === 'ltte') this.kills++;
+  }
+
+  partnerGrenade(m) {
+    this.explode(new THREE.Vector3(...m.p), 7.5, 220, this.partner);
+  }
+
+  partnerInteract(m) {
+    if (m.kind === 'target') { const t = this.world.targets[m.i]; if (t && !t.done) this.completeTarget(t); }
+    if (m.kind === 'alarm') { const a = this.world.alarms[m.i]; if (a && !a.disabled) this.completeAlarm(a); }
+  }
+
+  coopEnd(m) {
+    if (this.state !== 'playing' || this.endTimer > 0) return;
+    if (m.ok) this.missionComplete();
+    else this.missionFailed(m.reason);
+  }
+
+  onPartnerLost() {
+    this.toast('Your partner has disconnected', true);
+    this.net.setStatus('Partner disconnected.');
+    if (this.partner) {
+      this.partner.remove();
+      this.units.splice(this.units.indexOf(this.partner), 1);
+      this.partner = null;
+    }
+    if (this.net.role === 'guest' && this.state === 'playing') this.missionFailed('Lost the connection to the host.');
+    this.refreshCoop();
   }
 
   orderSquad() {
@@ -1126,6 +1411,27 @@ class Game {
     this.audio.hitmark();
   }
 
+  completeTarget(t) {
+    if (this.net.active && this.net.role === 'guest') {
+      this.net.send({ t: 'interact', kind: 'target', i: this.world.targets.indexOf(t) });
+      if (t.plant) this.toast('Charge set — move away! (4 s)');
+      t.done = true;
+      return;
+    }
+    t.done = true;
+    if (t.plant) { t.pending = true; this.toast('Charge set — move away! (4 s)'); this.charges.push({ target: t, timer: 4 }); }
+    else this.toast(t.doneText || `${t.label} done`, true);
+    if (this.net.active) this.net.send({ t: 'toast', text: t.plant ? 'Charge set — move away!' : t.doneText || `${t.label} done`, big: !t.plant });
+  }
+
+  completeAlarm(a) {
+    a.disabled = true;
+    if (a.triggered) this.audio.siren(false);
+    this.toast('Alarm sabotaged', true);
+    if (this.net.active && this.net.role === 'guest') this.net.send({ t: 'interact', kind: 'alarm', i: this.world.alarms.indexOf(a) });
+    else if (this.net.active) this.net.send({ t: 'toast', text: 'Alarm sabotaged', big: true });
+  }
+
   findInteraction() {
     const o = this.currentObjective(), p = this.player.pos;
     const near = (x, z, r) => Math.hypot(x - p.x, z - p.z) < r;
@@ -1134,11 +1440,7 @@ class Game {
       if (t) {
         return {
           label: `${t.plant ? 'Plant charge on' : 'Operate'} ${t.label}`, time: t.time,
-          done: () => {
-            t.done = true;
-            if (t.plant) { t.pending = true; this.toast('Charge set — move away! (4 s)'); this.charges.push({ target: t, timer: 4 }); }
-            else this.toast('The sluice gates are open — water is flowing to the paddy fields again', true);
-          },
+          done: () => this.completeTarget(t),
         };
       }
     }
@@ -1146,7 +1448,7 @@ class Game {
     if (a) {
       return {
         label: 'Sabotage the alarm', time: 3,
-        done: () => { a.disabled = true; if (a.triggered) this.audio.siren(false); this.toast('Alarm sabotaged', true); },
+        done: () => this.completeAlarm(a),
       };
     }
     const pl = this.player;
@@ -1179,13 +1481,16 @@ class Game {
     $('.prompt-bar div').style.width = `${Math.min(100, this.interactProgress * 100)}%`;
   }
 
-  detonate(t) {
+  // visualOnly: the guest shows a blast the host has already resolved
+  detonate(t, visualOnly = false) {
     const pos = new THREE.Vector3(t.x, Math.max(t.y, this.world.water ?? t.y), t.z);
     if (t.obj) this.world.group.remove(t.obj);
+    t.blown = true;
     this.world.colliders = this.world.colliders.filter((c) => c.ref !== t);
+    if (visualOnly) { this.fx.explosion(pos); this.audio.explosion(pos); this.killfeed(t.blast || `${t.label} destroyed`); return; }
     this.explode(pos, 7, 200, this.player);
     t.pending = false;
-    this.killfeed('Sea Tiger boat destroyed');
+    this.killfeed(t.blast || `${t.label} destroyed`);
   }
 
   // ------------------------------------------------------------ camera
@@ -1264,8 +1569,11 @@ class Game {
     $('.crosshair').style.setProperty('--gap', `${gap}px`);
 
     // squad status
-    const allies = this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup');
-    $('.squad').innerHTML = allies.map((a) => `${a.name}${a.role === 'marksman' ? ' (marksman)' : ''} · ${(a.order || 'follow').toUpperCase()}${a.hp < 60 ? ' · wounded' : ''}`).join('<br>');
+    const allies = this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup' && !u.remote);
+    const roleTag = { marksman: ' (marksman)', gunner: ' (gunner)', medic: ' (medic)' };
+    const partnerLine = this.partner ? `<span style="color:#7fc8e8">${this.partner.name} (co-op) · ${Math.max(0, Math.round(this.partner.hp))}%</span><br>` : '';
+    $('.squad').innerHTML = partnerLine + allies.map((a) => `${a.name}${roleTag[a.role] || ''} · ${(a.order || 'follow').toUpperCase()}`
+      + `${a.role === 'medic' ? (a.patient ? ' · treating' : ` · ${a.kits} dressings`) : ''}${a.hp < 60 ? ' · wounded' : ''}`).join('<br>');
 
     // waypoint
     const wp = this.objectiveWaypoint();
@@ -1490,6 +1798,7 @@ class Game {
   frame() {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.update(dt);
+    this.net.update(dt);
     if (!this.world) return;
     this.world.update(dt, this.camera, this.time);
     this.weather?.update(dt, this.camera);
@@ -1525,6 +1834,7 @@ class Game {
   }
 
   update(dt) {
+    this.frameDt = dt;
     if (this.state === 'playing') {
       this.time += dt;
       this.missionTime += dt;
@@ -1545,14 +1855,16 @@ class Game {
       if (!this.outro && this.input.hit('KeyM')) this.toggleMap();
       if (this.outro) { this.player.sync(dt); this.input.consumeLook(); } else this.updatePlayer(dt);
       this.updateProjectiles(dt);
-      for (const u of this.units) if (!u.isPlayer) u.update(dt);
+      // the co-op guest only draws the host's units; the host runs their AI
+      const guest = this.net.active && this.net.role === 'guest';
+      for (const u of this.units) if (!u.isPlayer) { if (guest) u.netSync(dt); else u.update(dt); }
       this.alertLevel = Math.max(0, this.alertLevel - dt);
       this.updateShelling(dt);
       this.radio.update(dt);
       if (!this.flags.contact && this.units.some((u) => u.team === 'ltte' && u.alive && u.state === 'combat')) this.storyEvent('contact');
       for (const c of this.charges) if ((c.timer -= dt) <= 0) this.detonate(c.target);
       this.charges = this.charges.filter((c) => c.timer > 0);
-      this.checkObjective();
+      if (!guest) this.checkObjective();
       if (this.endTimer > 0) {
         this.endTimer -= dt;
         if (this.endTimer <= 0) this.endAction();
@@ -1591,6 +1903,15 @@ window.__game = game;
 loadModels((k) => { $('.loading-bar div').style.width = `${Math.round(k * 100)}%`; })
   .then(() => {
     game.startMission(Math.min(game.profile.data.unlocked, MISSIONS.length - 1));
+    const join = new URLSearchParams(location.search).get('join');
+    if (join) {
+      // opened from a co-op invite link
+      game.profile.data.seenPrologue = true;
+      game.showCoop();
+      game.net.join(join);
+      game.refreshCoop();
+      return;
+    }
     game.state = 'start';
     game.show('start');
     game.focusFirst();

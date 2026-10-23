@@ -1,7 +1,7 @@
 // Player profile: campaign progress, XP, rank, commendations and settings,
 // saved in browser storage. Invalid or missing saves fall back to defaults.
 
-import { medalsFor, MEDALS, missionXP, rankFor } from './story.js';
+import { LOADOUT, medalsFor, MEDALS, missionXP, rankFor } from './story.js';
 
 const KEY = 'wanni_front_profile_v1';
 const OLD_KEY = 'wanni_front_progress';
@@ -17,6 +17,7 @@ function defaults() {
     medals: [],
     seenPrologue: false,
     campaignComplete: false,
+    loadout: { primary: 't56', gear: 'grenades', optics: 'none' },
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -28,13 +29,20 @@ function clampNum(v, lo, hi, def) {
 function validate(raw, missionIds) {
   const p = defaults();
   if (!raw || typeof raw !== 'object') return p;
-  p.unlocked = Math.round(clampNum(raw.unlocked, 0, missionIds.length - 1, 0));
   p.done = Array.isArray(raw.done) ? raw.done.filter((id) => missionIds.includes(id)) : [];
+  // the unlocked mission follows from the completed ones, so saves survive
+  // new missions being inserted into the campaign
+  const last = Math.max(-1, ...p.done.map((id) => missionIds.indexOf(id)));
+  p.unlocked = p.done.length ? Math.min(missionIds.length - 1, last + 1) : Math.round(clampNum(raw.unlocked, 0, missionIds.length - 1, 0));
   if (raw.best && typeof raw.best === 'object') {
     for (const id of missionIds) if (typeof raw.best[id] === 'number' && raw.best[id] > 0) p.best[id] = Math.round(raw.best[id]);
   }
   p.medals = Array.isArray(raw.medals) ? raw.medals.filter((m) => m in MEDALS) : [];
   p.seenPrologue = raw.seenPrologue === true;
+  const lo = raw.loadout || {};
+  for (const slot of Object.keys(LOADOUT)) {
+    if (LOADOUT[slot].some((o) => o.id === lo[slot])) p.loadout[slot] = lo[slot];
+  }
   p.campaignComplete = raw.campaignComplete === true;
   const s = raw.settings || {};
   p.settings = {

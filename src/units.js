@@ -44,6 +44,16 @@ export class Unit {
     this.base = {};
     for (const [k, o] of Object.entries(this.parts)) if (o) this.base[k] = o.rotation.clone();
     if (team === 'civ') this.tintCivilian();
+    if (opts.weapon && this.parts.rifle && models[opts.weapon]) {
+      // swap the rifle for another weapon model (the support gunner's machine gun)
+      const r = this.parts.rifle, w = models[opts.weapon].clone(true);
+      w.position.copy(r.position);
+      w.rotation.copy(r.rotation);
+      r.parent.add(w);
+      r.visible = false;
+      this.parts.rifle = w;
+      this.parts.muzzle = w.getObjectByName('Muzzle') || this.parts.muzzle;
+    }
     game.scene.add(this.obj);
 
     // AI state
@@ -60,6 +70,11 @@ export class Unit {
     this.patrolWait = Math.random() * 3;
     this.followSlot = opts.index ?? 0;
     this.lastHurt = 0;
+    this.suppressed = 0;
+    this.cover = null;
+    this.coverTimer = 0;
+    this.flankSide = 0;
+    this.kits = this.role === 'medic' ? 6 : 0;
     this.sync(0);
   }
 
@@ -108,6 +123,7 @@ export class Unit {
 
   damage(amount, from) {
     if (!this.alive) return;
+    if (this.remote) { this.game.net?.send({ t: 'dmg', v: Math.round(amount) }); this.lastHurt = this.game.time; return; }
     if (this.team === 'army' && !this.isPlayer) {
       // allies are wounded but never killed, so the squad stays with the player
       this.hp = Math.max(25, this.hp - amount);
@@ -140,6 +156,11 @@ export class Unit {
     this.lostTime = 0;
     if (!wasCalm) return;
     this.fireTimer = 0.6 + Math.random() * 0.8;
+    // some cadres work round the side instead of fighting from the front
+    if (!this.sentry && Math.random() < 0.3) {
+      this.flankSide = Math.random() < 0.5 ? 1 : -1;
+      this.flankUntil = this.game.time + 14;
+    }
     this.game.onEnemyAlerted?.(this);
     for (const u of this.game.units) {
       if (u !== this && u.alive && u.team === 'ltte' && u.state !== 'combat' && u.state !== 'alarm' && u.pos.distanceTo(this.pos) < 30) {
@@ -287,7 +308,17 @@ export class Unit {
 
   // ------------------------------------------------------------- AI
 
+  // co-op: glide towards the position the network last reported
+  netSync(dt) {
+    if (this.netPos) {
+      if (this.pos.distanceTo(this.netPos) > 6) this.pos.copy(this.netPos);
+      else this.pos.lerp(this.netPos, Math.min(1, dt * 12));
+    }
+    this.sync(dt);
+  }
+
   update(dt) {
+    if (this.remote) { this.netSync(dt); return; }
     if (!this.alive) { this.sync(dt); return; }
     if (this.isPlayer) return;
     if (this.team === 'civ') this.updateCivilian(dt);
@@ -300,14 +331,14 @@ export class Unit {
     if (this.state === 'wait') {
       this.speed = 0;
       const obj = g.currentObjective();
-      if (obj?.type === 'escort' && g.player.alive && g.player.pos.distanceTo(this.pos) < 12) {
+      if (obj?.type === 'escort' && g.nearestHuman(this.pos).pos.distanceTo(this.pos) < 12) {
         this.state = 'flee';
         g.toast('Civilians: "Thank you — we are coming!"');
       }
     } else if (this.state === 'flee') {
       const [zx, zz, zr] = g.currentObjective()?.zone || g.escortZone;
       // follow the player while near them, otherwise head for the safe zone
-      const pl = g.player;
+      const pl = g.nearestHuman(this.pos);
       let tx = zx, tz = zz;
       const toZone = Math.hypot(zx - this.pos.x, zz - this.pos.z);
       if (pl.alive && pl.pos.distanceTo(this.pos) > 9 && toZone > 30) { tx = pl.pos.x; tz = pl.pos.z; }
@@ -344,7 +375,9 @@ export class Unit {
 
   think(dt) {
     const alert = this.state === 'combat' || this.state === 'search' || this.state === 'alarm';
-    const view = this.sentry ? 95 : this.role === 'marksman' ? 110 : this.team === 'ltte' ? 62 : 75;
+    // at night cadres see far less; the section has night-vision optics
+    const night = this.team === 'ltte' && this.game.mission?.night ? 0.55 : 1;
+    const view = (this.sentry ? 95 : this.role === 'marksman' ? 110 : this.team === 'ltte' ? 62 : 75) * night;
     let best = null, bestD = Infinity;
     for (const h of this.hostiles()) {
       const d = h.pos.distanceTo(this.pos);
@@ -451,20 +484,54 @@ export class Unit {
 
       default: { // combat
         const tgt = this.visible;
+        this.suppressed = Math.max(0, this.suppressed - dt);
         if (tgt) {
           const dist = tgt.pos.distanceTo(this.pos);
           this.faceTowards(tgt.pos.x, tgt.pos.z, dt, 8);
           this.pitch = Math.atan2(tgt.pos.y - this.pos.y, dist);
-          // keep a fighting distance and side-step now and then
-          this.strafeTimer -= dt;
-          if (this.strafeTimer <= 0) { this.strafe = -this.strafe; this.strafeTimer = 1.5 + Math.random() * 2.5; }
-          const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
-          const adv = dist > 30 ? 1 : dist < 8 ? -1 : 0;
-          mx = fx * adv + -fz * this.strafe * 0.5;
-          mz = fz * adv + fx * this.strafe * 0.5;
-          speed = this.burst > 0 ? 0 : 2.2;
-          this.fireAt(tgt, dist, dt);
+          if (this.flankSide && g.time < this.flankUntil && !this.sentry) {
+            // work round the side of the enemy, firing only now and then
+            const dx = this.pos.x - tgt.pos.x, dz = this.pos.z - tgt.pos.z, dl = Math.hypot(dx, dz) || 1;
+            const px = -dz / dl * this.flankSide, pz = dx / dl * this.flankSide;
+            const fxp = tgt.pos.x + px * 16 + (dx / dl) * 9, fzp = tgt.pos.z + pz * 16 + (dz / dl) * 9;
+            if (Math.hypot(fxp - this.pos.x, fzp - this.pos.z) > 3) {
+              mx = fxp - this.pos.x; mz = fzp - this.pos.z; speed = 3.8;
+              this.stance = 'stand';
+              if (!this.flankCalled) { this.flankCalled = true; g.onFlank?.(this); }
+              if (Math.random() < 0.3) this.fireAt(tgt, dist, dt);
+              break;
+            }
+            this.flankSide = 0;
+          }
+          // fight from cover when there is some nearby
+          this.coverTimer -= dt;
+          if (this.coverTimer <= 0 && !this.sentry) {
+            this.cover = g.world.findCover(this.pos, tgt.pos, 12);
+            this.coverTimer = 3 + Math.random() * 2;
+          }
+          const c = this.cover;
+          if (c && Math.hypot(c.x - this.pos.x, c.z - this.pos.z) > 0.7) {
+            mx = c.x - this.pos.x; mz = c.z - this.pos.z; speed = 4;
+            this.stance = 'stand';
+          } else if (c) {
+            // in cover: duck, and rise to shoot
+            this.stance = this.burst > 0 || this.fireTimer < 0.35 ? 'stand' : 'crouch';
+            if (this.suppressed > 0) this.stance = 'crouch';
+          } else {
+            // no cover: keep a fighting distance and side-step now and then
+            this.strafeTimer -= dt;
+            if (this.strafeTimer <= 0) { this.strafe = -this.strafe; this.strafeTimer = 1.5 + Math.random() * 2.5; }
+            const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
+            const adv = dist > 30 ? 1 : dist < 8 ? -1 : 0;
+            mx = fx * adv + -fz * this.strafe * 0.5;
+            mz = fz * adv + fx * this.strafe * 0.5;
+            speed = this.burst > 0 || this.suppressed > 0 ? 0 : 2.2;
+            this.stance = this.suppressed > 0 ? 'crouch' : 'stand';
+          }
+          // pinned down by suppressing fire: fewer, wilder shots
+          if (this.suppressed <= 0 || Math.random() < 0.25) this.fireAt(tgt, dist, dt);
         } else {
+          this.stance = 'stand';
           this.lostTime = (this.lostTime || 0) + dt;
           const p = this.lastSeen || (g.player.alive ? g.player.pos : null);
           if (p && flat(p) > 4) {
@@ -484,6 +551,7 @@ export class Unit {
   updateAlly(dt) {
     const g = this.game, order = g.squadOrders || { mode: 'follow', fire: 'tight' };
     this.underFire = Math.max(0, (this.underFire || 0) - dt);
+    if (this.role === 'medic' && this.treat(dt)) return;
     let mx = 0, mz = 0, speed = 0;
     const tgt = this.visible;
     const engaged = tgt && (order.fire === 'free' || tgt.state === 'combat' || tgt.state === 'alarm' || g.alertLevel > 0 || this.underFire > 0);
@@ -498,8 +566,19 @@ export class Unit {
       this.faceTowards(tgt.pos.x, tgt.pos.z, dt, 8);
       this.pitch = Math.atan2(tgt.pos.y - this.pos.y, dist);
       this.fireAt(tgt, dist, dt);
-      if (myOrder === 'follow' && dist > 40) { mx = Math.sin(this.yaw); mz = Math.cos(this.yaw); speed = 2.5; }
+      // take cover close to where the section is
+      this.coverTimer -= dt;
+      if (this.coverTimer <= 0) {
+        this.cover = myOrder === 'move' ? null : g.world.findCover(this.pos, tgt.pos, 7);
+        this.coverTimer = 3 + Math.random() * 2;
+      }
+      if (this.cover && Math.hypot(this.cover.x - this.pos.x, this.cover.z - this.pos.z) > 0.7) {
+        mx = this.cover.x - this.pos.x; mz = this.cover.z - this.pos.z; speed = 4.5;
+      } else if (this.cover) {
+        this.stance = this.burst > 0 || this.fireTimer < 0.35 ? 'stand' : 'crouch';
+      } else if (myOrder === 'follow' && dist > 40) { mx = Math.sin(this.yaw); mz = Math.cos(this.yaw); speed = 2.5; }
     } else {
+      this.cover = null;
       this.pitch *= 0.9;
       let dest = null;
       if (myOrder === 'follow') dest = this.followPoint();
@@ -519,6 +598,44 @@ export class Unit {
     }
     this.move(mx, mz, speed, dt);
     this.separate(dt);
+  }
+
+  // Medic: go to the most badly wounded soldier (the player first) and treat
+  // them. Each treatment uses one of a limited number of field dressings.
+  treat(dt) {
+    const g = this.game;
+    if (this.kits <= 0) return false;
+    let pat = this.patient;
+    const needs = (u) => u.alive && u.team === 'army' && u !== this && u.tag !== 'linkup'
+      && u.hp < (u.isPlayer ? (g.medicCalled ? 97 : 60) : u.maxHp * 0.55) && u.pos.distanceTo(this.pos) < 50;
+    if (!pat || !needs(pat) && !this.treating) {
+      const list = g.units.filter(needs).sort((a, b) => (b.isPlayer - a.isPlayer) || a.hp / a.maxHp - b.hp / b.maxHp);
+      pat = list[0] || null;
+      if (pat && pat !== this.patient) g.onMedic?.(this, pat, 'coming');
+      this.patient = pat;
+      this.treating = false;
+    }
+    if (!pat || !pat.alive) { this.patient = null; this.treating = false; return false; }
+    const d = Math.hypot(pat.pos.x - this.pos.x, pat.pos.z - this.pos.z);
+    this.faceTowards(pat.pos.x, pat.pos.z, dt, 6);
+    if (d > 1.5 && !this.treating) {
+      this.stance = 'stand';
+      this.move(pat.pos.x - this.pos.x, pat.pos.z - this.pos.z, d > 6 ? 5.5 : 3, dt);
+      this.separate(dt);
+      return true;
+    }
+    if (d > 3) { this.treating = false; return true; }
+    this.treating = true;
+    this.stance = 'crouch';
+    this.move(0, 0, 0, dt);
+    pat.hp = Math.min(pat.maxHp, pat.hp + (pat.isPlayer ? 16 : 40) * dt);
+    if (pat.hp >= pat.maxHp * 0.98) {
+      this.kits--;
+      this.treating = false;
+      this.patient = null;
+      g.onMedic?.(this, pat, 'done');
+    }
+    return true;
   }
 
   followPoint() {
@@ -549,17 +666,21 @@ export class Unit {
     const marksman = this.role === 'marksman';
     this.fireTimer -= dt;
     if (this.fireTimer > 0) return;
-    if (this.burst <= 0) this.burst = marksman || this.sentry ? 1 : 2 + Math.floor(Math.random() * 4);
+    const gunner = this.role === 'gunner';
+    if (this.burst <= 0) this.burst = marksman || this.sentry ? 1 : gunner ? 7 + Math.floor(Math.random() * 6) : 2 + Math.floor(Math.random() * 4);
     this.burst--;
-    this.fireTimer = this.burst > 0 ? 0.11 : marksman ? 2.2 + Math.random() : 0.9 + Math.random() * 1.2;
+    this.fireTimer = this.burst > 0 ? (gunner ? 0.085 : 0.11) : marksman ? 2.2 + Math.random() : gunner ? 1.4 + Math.random() : 0.9 + Math.random() * 1.2;
 
     const from = this.muzzleWorld(new THREE.Vector3());
     let chance;
-    if (this.team === 'army') chance = marksman ? THREE.MathUtils.clamp(0.75 - dist / 300, 0.35, 0.7) : THREE.MathUtils.clamp(0.45 - dist / 120, 0.1, 0.4);
-    else {
+    if (this.team === 'army') {
+      chance = marksman ? THREE.MathUtils.clamp(0.75 - dist / 300, 0.35, 0.7)
+        : gunner ? THREE.MathUtils.clamp(0.3 - dist / 150, 0.08, 0.28) : THREE.MathUtils.clamp(0.45 - dist / 120, 0.1, 0.4);
+    } else {
       chance = THREE.MathUtils.clamp((this.sentry ? 0.5 : 0.42) - dist / (this.sentry ? 220 : 130), 0.05, 0.4);
       chance *= THREE.MathUtils.clamp(tgt.exposure ?? 1, 0.35, 1.3);
       if (tgt.isPlayer) chance *= g.difficulty;
+      if (this.suppressed > 0) chance *= 0.35;
     }
     const hit = Math.random() < chance;
     const aim = new THREE.Vector3(tgt.pos.x, tgt.pos.y + Math.min(1.2, tgt.bodyHeight - 0.2), tgt.pos.z);
@@ -572,6 +693,8 @@ export class Unit {
     const res = g.world.raycast(from, dir, 250, this);
     const end = res ? res.point : from.clone().addScaledVector(dir, 250);
     g.fx.tracer(from, end, this.team === 'ltte' ? 0xffb060 : 0xfff2a0);
+    if (g.net?.active && g.net.role === 'host') g.net.send({ t: 'fx', a: from.toArray().map((v) => Math.round(v * 100) / 100), b: end.toArray().map((v) => Math.round(v * 100) / 100), c: this.team === 'ltte' ? 0xffb060 : 0xfff2a0 });
+    if (this.team === 'army') g.suppress?.(end, gunner ? 4.5 : 2.5, gunner ? 3 : 1.5);
     g.fx.muzzle(from);
     g.audio.shot(from, false);
     if (res?.kind === 'unit') {

@@ -9,11 +9,11 @@ export const CHARACTERS = {
   awan: { name: 'Awan', role: 'Section commander (you)', color: '#e0b84a' },
   ruwan: { model: 'soldier_army', name: 'Sgt. Ruwan Jayasekara', short: 'Sgt. Ruwan', role: 'Section sergeant · rifleman', color: '#9bd16a',
     bio: 'Fifteen years in uniform. His older brother was at Elephant Pass when it fell in 2000. Calls you "Sir" with a grin.' },
-  nimal: { model: 'soldier_army', name: 'Cpl. Nimal "Nimo" Fernando', short: 'Cpl. Nimal', role: 'Support gunner', color: '#7fc8e8',
+  nimal: { model: 'soldier_army', ai: 'gunner', name: 'Cpl. Nimal "Nimo" Fernando', short: 'Cpl. Nimal', role: 'Support gunner', color: '#7fc8e8',
     bio: 'From Negombo. Jokes under fire, misses his mother\'s kiribath and organises every celebration.' },
   kasun: { model: 'soldier_ghillie', ai: 'marksman', name: 'L/Cpl. Kasun Herath', short: 'L/Cpl. Kasun', role: 'Recon · marksman (SVD, ghillie suit)', color: '#e89a6a',
     bio: 'The youngest. Writes letters to his little sister in Anuradhapura. Sees everything first.' },
-  prakash: { model: 'soldier_sf', name: 'Pte. Prakash Rajan', short: 'Pte. Prakash', role: 'Medic · Tamil interpreter', color: '#d79be8',
+  prakash: { model: 'soldier_sf', ai: 'medic', name: 'Pte. Prakash Rajan', short: 'Pte. Prakash', role: 'Medic · Tamil interpreter', color: '#d79be8',
     bio: 'A Tamil soldier from Batticaloa. Patches everyone up, and speaks to frightened families in their own language.' },
   sunil: { model: 'soldier_army', name: 'Pte. Sunil Dias', short: 'Pte. Sunil', role: 'Rifleman (replacement)', color: '#b8c4a0',
     bio: 'Joins the section after Kilinochchi. Eager, nervous, brave.' },
@@ -36,10 +36,14 @@ export const RANKS = [
 // Fictional game commendations (not real military decorations)
 export const MEDALS = {
   water: { name: 'Water Bearer', desc: 'Reopen the Mavil Aru sluice gates.' },
+  harbour: { name: 'Harbour Lights', desc: 'Silence the guns at Sampur.' },
+  lagoon: { name: 'Safe Crossing', desc: 'Bring every family to the boats at Vakarai without a shot near a civilian.' },
   jungle: { name: 'Ghost of Baron\'s Cap', desc: 'Complete Thoppigala on Veteran.' },
   coast: { name: 'Coast Watcher', desc: 'Destroy every Sea Tiger boat at Nachchikuda.' },
   bund: { name: 'Bund Breaker', desc: 'Break the Kilinochchi defence line.' },
   causeway: { name: 'Road Home', desc: 'Link up with the 53 Division at Elephant Pass.' },
+  ring: { name: 'Hold the Line', desc: 'Hold the junction at Anandapuram.' },
+  night: { name: 'Night Crossing', desc: 'Breach the bund at Puthumathalan without the siren sounding.' },
   shield: { name: 'Shield of the Innocent', desc: 'Complete Nandikadal without a single shot near a civilian.' },
   steady: { name: 'Steady Hand', desc: 'Finish any mission with 60% accuracy or better.' },
   veteran: { name: 'Veteran of the Wanni', desc: 'Complete the whole campaign.' },
@@ -87,9 +91,70 @@ export const STORY = {
     debrief: 'Water reached the paddy fields that evening. Nimal swore he could already smell the rice. In his notebook Awan wrote one line: "Everyone came back."',
   },
 
+  sampur: {
+    squad: ['ruwan', 'nimal', 'kasun'],
+    briefing: 'Three weeks after Mavil Aru. Across the bay, the harbour at Trincomalee has been shelled for days. Ruwan says the section has stopped being new.',
+    intro: [
+      ['command', 'Two-One, Lion Actual. Guns at Sampur are firing on the harbour. Break the bunker line and find them.'],
+      ['ruwan', 'Open scrub, Sir. Use the palmyrah trunks — they stop more than you think.'],
+      ['nimal', 'This gun is heavier than my wedding cake, and I carried that up three flights of stairs.'],
+      ['tip', 'Nimal is your support gunner: his long bursts pin the enemy down so others can move. H calls the medic when one is with you.'],
+    ],
+    objectives: {
+      1: [
+        ['kasun', 'Gun pits south of us, Sir. Two barrels, sandbags round both. Lots of men.'],
+        ['ruwan', 'An alarm pole beside them. Quiet if we can.'],
+      ],
+      2: [['ruwan', 'Charges on both guns, Sir. Then get clear — they\'ll go up with the shells.']],
+      3: [
+        ['command', 'Two-One, the harbour has gone quiet. Secure the village.'],
+        ['nimal', 'Quiet. I\'d forgotten what it sounds like.'],
+      ],
+    },
+    events: {
+      contact: [['kasun', 'Contact — bunker line, front!']],
+      hurt: [['ruwan', 'Down, Sir! Let me draw them.']],
+    },
+    outro: [
+      ['ruwan', 'No more shells on the harbour tonight.'],
+      ['kasun', 'From the shore I can see the ships, Sir. The lights are on.'],
+    ],
+    debrief: 'That night Nimal cooked rice for the whole section on a borrowed stove. Kasun wrote to his sister that he had seen Trincomalee\'s lights from across the bay.',
+  },
+
+  vakarai: {
+    squad: ['ruwan', 'nimal', 'kasun', 'prakash'],
+    briefing: 'January 2007. A new soldier joins at the lagoon: Private Prakash Rajan, a medic from Batticaloa who speaks Tamil. Families are waiting to cross, and someone has to talk to them.',
+    intro: [
+      ['command', 'Two-One, civilians are gathering near the village. Clear the shore and bring them to the boats.'],
+      ['prakash', 'Private Rajan, Sir. Medic. I grew up two hours from here.'],
+      ['ruwan', 'Welcome to the section. Stay behind me until it\'s your turn.'],
+      ['tip', 'Prakash is your medic: when you are badly hurt he comes to treat you, or press H to call him. Your wounds only heal to 60% on their own.'],
+    ],
+    objectives: {
+      1: [['kasun', 'Huts ahead. I can see families inside, and fighters around them.']],
+      2: [
+        ['prakash', 'Amma, payappadatheenga — don\'t be afraid. The boats are waiting.'],
+        ['prakash', 'They\'ll follow you, Sir. Walk slowly.'],
+      ],
+      3: [['command', 'Two-One, last position south of the town. Finish it.']],
+    },
+    events: {
+      contact: [['nimal', 'Contact on the shore!']],
+      hurt: [['prakash', 'Sir! Stay still — I\'ve got you.']],
+      allSafe: [['prakash', 'Everyone is on the boats.']],
+      civilianWarning: [['ruwan', 'Check your fire — families in the huts!']],
+    },
+    outro: [
+      ['prakash', 'An old man asked me my village. When I told him, he said he knew my grandfather.'],
+      ['ruwan', 'You\'ll do, Rajan.'],
+    ],
+    debrief: 'Prakash spent the night at the landing helping a mother find her two sons among the families. He found them asleep on a fishing boat.',
+  },
+
   thoppigala: {
     squad: ['ruwan', 'kasun', 'prakash'],
-    briefing: 'Eleven months later. The army now fights in small teams: eight soldiers, no roads, days without resupply. Kasun has become the section\'s eyes, and Private Prakash — a medic from Batticaloa — has joined them.',
+    briefing: 'Six months after Vakarai. The army now fights in small teams: eight soldiers, no roads, days without resupply. Kasun has become the section\'s eyes, and Prakash carries the medic\'s bag everywhere.',
     intro: [
       ['command', 'Two-One, you are the left-hand team. Stay off the main tracks — they\'re mined.'],
       ['ruwan', 'Single file. Watch where Kasun steps, and step there.'],
@@ -199,6 +264,68 @@ export const STORY = {
     debrief: 'That night Ruwan called his brother on a borrowed phone. He didn\'t say much. Only: "I was there today. It\'s open again."',
   },
 
+  anandapuram: {
+    squad: ['ruwan', 'nimal', 'prakash', 'sunil'],
+    briefing: 'April 2009. Kasun is still in hospital. The section has fought across the Wanni for months, and now the enemy is surrounded — which makes them more dangerous, not less.',
+    intro: [
+      ['command', 'Two-One, the enemy is encircled near Anandapuram. Expect them to try to break out through you.'],
+      ['ruwan', 'Clear the grove, then we dig in at the junction.'],
+      ['sunil', 'Sir… is it true they have nowhere left to go?'],
+      ['ruwan', 'That\'s why they will fight hardest here, Sunil.'],
+    ],
+    objectives: {
+      1: [
+        ['command', 'Break-out attempt in progress. Hold that junction, Two-One.'],
+        ['tip', 'Stay inside the marked position until the timer runs out. Crates refill ammunition and give first aid.'],
+      ],
+      2: [['nimal', 'They\'ve pulled back. Some are still out there.']],
+      3: [['ruwan', 'Behind the bund. Last of them. Carefully now.']],
+    },
+    events: {
+      contact: [['nimal', 'Contact in the coconut grove!']],
+      hurt: [['prakash', 'Sir, get down behind the sandbags — I\'m coming.']],
+    },
+    outro: [
+      ['sunil', 'I thought it would feel like winning.'],
+      ['ruwan', 'It never does, Sunil.'],
+    ],
+    debrief: 'Nimal did not tell jokes that night. Sunil sat with him until morning without saying a word, and Awan let them both sleep late.',
+  },
+
+  puthumathalan: {
+    squad: ['ruwan', 'nimal', 'prakash', 'sunil'],
+    briefing: 'The night of 19 April 2009. Behind the earth bund are families who have tried to leave for weeks. The section is to open a way out before dawn — quietly.',
+    intro: [
+      ['command', 'Two-One, Lion Actual. Night-vision issued. The bund line has a siren. Silence it before they see you.'],
+      ['ruwan', 'Weapons tight. Suppressed pistols where you can.'],
+      ['tip', 'Press N for night vision. In the dark, cadres see you from much closer — use it. 2 is the suppressed pistol.'],
+    ],
+    objectives: {
+      1: [['ruwan', 'Now the charge. Centre of the bund, Sir. When it goes, everyone will know we\'re here.']],
+      2: [
+        ['command', 'Bund breached. Clear the gap, Two-One.'],
+        ['nimal', 'Here they come — weapons free!'],
+      ],
+      3: [['prakash', 'The families are in the ruins south of here, Sir. Let me go to them first.']],
+      4: [
+        ['prakash', 'Amma, vaanga — come, quickly, stay together. They are with me.'],
+        ['saraswathi', 'We have tried three times. Is it true this time?'],
+        ['prakash', 'It is true. Hold my hand.'],
+      ],
+    },
+    events: {
+      contact: [['sunil', 'They\'ve seen us!']],
+      hurt: [['prakash', 'Sir, you\'re hit — stay down.']],
+      allSafe: [['prakash', 'They\'re through the bund. All of them.']],
+      civilianWarning: [['ruwan', 'Hold fire — families!']],
+    },
+    outro: [
+      ['ruwan', 'Look behind us, Sir. They keep coming. Hundreds of them.'],
+      ['prakash', 'By morning there will be thousands.'],
+    ],
+    debrief: 'Mrs. Saraswathi and her grandson Kavin crossed the bund in the grey before dawn. Prakash carried the boy the last kilometre on his shoulders.',
+  },
+
   nandikadal: {
     squad: ['ruwan', 'nimal', 'prakash', 'kasun'],
     briefing: 'May 2009. Kasun has talked his way out of hospital. The orders are different now: open a way out for families trapped on the strip. Prakash will speak to them in Tamil.',
@@ -244,12 +371,16 @@ export const PROLOGUE = {
   ],
   fiction: 'The characters in this story are fictional. The places, dates and operations around them are real.',
   places: [
-    { name: 'Mavil Aru', date: 'Jul 2006', lat: 8.32, lon: 81.22, dx: 8, dy: 4 },
+    { name: 'Mavil Aru', date: 'Jul 2006', lat: 8.32, lon: 81.22, dx: -8, dy: 4, anchor: 'end' },
+    { name: 'Sampur', date: 'Sep 2006', lat: 8.49, lon: 81.30, dx: 8, dy: -2 },
+    { name: 'Vakarai', date: 'Jan 2007', lat: 8.16, lon: 81.43, dx: 8, dy: 4 },
     { name: 'Thoppigala', date: 'Jul 2007', lat: 7.82, lon: 81.40, dx: 8, dy: 4 },
     { name: 'Pooneryn', date: 'Nov 2008', lat: 9.50, lon: 80.21, dx: -8, dy: -4, anchor: 'end' },
     { name: 'Kilinochchi', date: 'Jan 2009', lat: 9.39, lon: 80.40, dx: -8, dy: 18, anchor: 'end' },
     { name: 'Elephant Pass', date: 'Jan 2009', lat: 9.55, lon: 80.42, dx: 8, dy: -6 },
-    { name: 'Nandikadal', date: 'May 2009', lat: 9.33, lon: 80.74, dx: 8, dy: 6 },
+    { name: 'Anandapuram', date: 'Apr 2009', lat: 9.28, lon: 80.68, dx: -8, dy: 14, anchor: 'end' },
+    { name: 'Puthumathalan', date: 'Apr 2009', lat: 9.38, lon: 80.78, dx: 8, dy: -8 },
+    { name: 'Nandikadal', date: 'May 2009', lat: 9.33, lon: 80.74, dx: 8, dy: 8 },
   ],
 };
 
@@ -273,6 +404,8 @@ export const HISTORY_TIMELINE = [
   ['April 2000', 'The Elephant Pass base falls to the LTTE, cutting Jaffna off by land.'],
   ['February 2002', 'A Norway-brokered ceasefire is signed and monitored by the SLMM.'],
   ['July 2006', 'The LTTE closes the Mavil Aru sluice gates; the military operation that follows begins Eelam War IV.'],
+  ['September 2006', 'The army takes Sampur, ending LTTE shelling of Trincomalee harbour.'],
+  ['January 2007', 'Vakarai is captured; tens of thousands of civilians leave the area.'],
   ['July 2007', 'Thoppigala is captured; the government declares the Eastern Province cleared.'],
   ['November 2008', 'Pooneryn is taken; the western coast is in government hands.'],
   ['January 2009', 'Kilinochchi (2 Jan), Elephant Pass (9 Jan) and Mullaitivu (25 Jan) fall to the army.'],
@@ -310,6 +443,27 @@ export const SOURCES = [
 
 // ---------------------------------------------------------------- progression
 
+// Loadout choices and the rank that unlocks each one
+export const LOADOUT = {
+  primary: [
+    { id: 't56', name: 'T-56 assault rifle', rank: '2lt', desc: 'Reliable, accurate in short bursts. 30-round magazines.' },
+    { id: 'lmg', name: 'Light machine gun', rank: 'lt', desc: '100-round belt. Pins the enemy down, but you move slower and reload for longer.' },
+  ],
+  gear: [
+    { id: 'grenades', name: 'Grenades ×3', rank: '2lt', desc: 'Standard issue.' },
+    { id: 'mags', name: 'Extra magazines', rank: 'lt', desc: '+50% ammunition for every weapon.' },
+    { id: 'pouch', name: 'Grenade pouch ×5', rank: 'capt', desc: 'Five grenades instead of three.' },
+  ],
+  optics: [
+    { id: 'none', name: 'No night vision', rank: '2lt', desc: 'Night-vision goggles are still issued for night operations.' },
+    { id: 'nvg', name: 'Night-vision goggles', rank: 'capt', desc: 'Carry NVGs on every operation. Press N to toggle.' },
+  ],
+};
+
+export function rankIndex(id) {
+  return RANKS.findIndex((r) => r.id === id);
+}
+
 export function rankFor(xp) {
   let r = RANKS[0];
   for (const k of RANKS) if (xp >= k.xp) r = k;
@@ -337,6 +491,10 @@ export function missionXP(r) {
 export function medalsFor(missionId, r) {
   const m = [];
   if (missionId === 'mavilaru') m.push('water');
+  if (missionId === 'sampur') m.push('harbour');
+  if (missionId === 'vakarai' && r.civilianIncidents === 0) m.push('lagoon');
+  if (missionId === 'anandapuram') m.push('ring');
+  if (missionId === 'puthumathalan' && !r.alarmRaised) m.push('night');
   if (missionId === 'thoppigala' && r.difficulty > 1.2) m.push('jungle');
   if (missionId === 'pooneryn') m.push('coast');
   if (missionId === 'kilinochchi') m.push('bund');
