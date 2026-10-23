@@ -140,7 +140,7 @@ Rules:
 | E | M4 — Loadout | Loadout screen, LMG, rank unlocks, night vision for night missions | 🔜 |
 | C | M5 — New missions | Sampur, Vakarai, Anandapuram, Puthumathalan | 🔜 |
 | F | M6 — Co-op | PeerJS lobby, invite links, sync, disconnect handling | 🔜 |
-| G | M7 — Release | Graphics settings, performance pass, GitHub Pages deployment, verified URL | 🔜 |
+| G | M7 — Release | Graphics settings (low/medium/high) ✅, Vercel deployment with auto-deploy from `main` ✅ (https://wanni-front.vercel.app), performance pass on real hardware 🔜 | 🟡 |
 
 ## 9. Testing
 

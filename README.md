@@ -2,6 +2,8 @@
 
 **වන්නි සටන් බිම** is a 3D third-person game that runs in the browser. You play a Sri Lanka Army soldier through six real operations from the final phase of the Sri Lankan Civil War. All 3D models are built in **Blender** with a Python script, and the game runs on **Three.js**.
 
+**Play online:** https://wanni-front.vercel.app. It is hosted on Vercel, and every push to `main` deploys automatically. Use a desktop browser with a mouse and keyboard.
+
 ![Mavil Aru](docs/mavil-aru.png)
 
 ## Campaign
