@@ -16,7 +16,7 @@ export class Unit {
     this.team = team; // 'army' | 'ltte' | 'civ'
     this.tag = opts.tag || null;
     this.isPlayer = !!opts.player;
-    this.name = team === 'army' && !this.isPlayer ? ALLY_NAMES[opts.index % ALLY_NAMES.length] : null;
+    this.name = team === 'army' && !this.isPlayer ? opts.name || ALLY_NAMES[opts.index % ALLY_NAMES.length] : null;
     this.pos = new THREE.Vector3(x, game.world.height(x, z), z);
     this.vel = new THREE.Vector3();
     this.yaw = opts.yaw ?? 0;

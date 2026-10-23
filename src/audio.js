@@ -8,14 +8,14 @@ export class Audio {
   }
 
   init() {
-    if (this.ctx) { this.ctx.resume(); return; }
+    if (this.ctx) { if (this.ctx.state !== 'running') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
     this.master.gain.value = this.volume;
     this.master.connect(this.ctx.destination);
-    const len = this.ctx.sampleRate * 2;
+    const len = this.ctx.sampleRate * 5;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -95,6 +95,67 @@ export class Audio {
 
   hitmark() {
     this.burst({ dur: 0.05, freq: 6000, q: 4, type: 'bandpass', vol: 0.25 });
+  }
+
+  setVolume(v) {
+    this.volume = v;
+    if (this.master) this.master.gain.value = v;
+  }
+
+  // short squelch + beep when someone speaks on the radio
+  radio() {
+    this.burst({ dur: 0.08, freq: 2400, q: 1.5, type: 'bandpass', vol: 0.12 });
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime, o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.frequency.value = 1450;
+    g.gain.setValueAtTime(0.05, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + 0.1);
+  }
+
+  thunder() {
+    this.burst({ dur: 3.5, freq: 160, vol: 1.6, thump: 38, attack: 0.25 });
+  }
+
+  // rain bed for cinematics and wet missions
+  rain(on) {
+    if (!this.ctx) return;
+    if (on && !this.rainSrc) {
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      const f = this.ctx.createBiquadFilter();
+      f.type = 'highpass';
+      f.frequency.value = 900;
+      const g = this.ctx.createGain();
+      g.gain.value = 0.18;
+      src.connect(f).connect(g).connect(this.master);
+      src.start();
+      this.rainSrc = src;
+    } else if (!on && this.rainSrc) {
+      this.rainSrc.stop();
+      this.rainSrc = null;
+    }
+  }
+
+  // two-note cue for mission start / completion
+  stinger(up = true) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const notes = up ? [220, 330, 440] : [330, 262, 196];
+    notes.forEach((f, i) => {
+      const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t + i * 0.18);
+      g.gain.exponentialRampToValueAtTime(0.12, t + i * 0.18 + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.18 + 1.2);
+      o.connect(g).connect(this.master);
+      o.start(t + i * 0.18);
+      o.stop(t + i * 0.18 + 1.3);
+    });
   }
 
   startAmbience() {

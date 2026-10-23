@@ -19,6 +19,29 @@ Each mission has a historical briefing and debrief. The campaign ends with an ep
 
 ![Nandikadal](docs/nandikadal.png)
 
+## Story campaign
+
+You play **Awan**, a fictional officer who starts as a Second Lieutenant. He leads his section — Sgt. Ruwan, Cpl. Nimal, L/Cpl. Kasun, Pte. Prakash — from Mavil Aru (2006) to Nandikadal (2009).
+
+- **Prologue cinematic.** Rain and thunder, a map of Sri Lanka with the six operations, a fly-over that introduces the squad, then the title. You can skip it with the button, Esc, Space or Enter.
+- **Radio dialogue.** Every mission has spoken lines (as subtitles) at the start, for each objective, for events like first contact or being wounded, and at the end.
+- **Briefings and debriefs** keep the **Historical record** and the **Your section — fiction** text clearly apart.
+- **XP, ranks and commendations.** The ranks are Second Lieutenant → Lieutenant → Captain → Major. Only your best result per mission counts, so replaying never doubles XP. When you are promoted, the squad celebrates with kiribath and tea.
+- **Menus:** Continue Campaign, New Campaign, Mission Selection, Squad, Player Profile (with reset), Historical Archive (timeline, human cost, sources), Settings (sensitivity, volume, difficulty, graphics) and Credits. Loadout and multiplayer are shown as *planned* and disabled.
+- **Epilogue:** a historical timeline, the human cost on every side, where the fictional squad ended up, and a message of remembrance.
+
+The full design and roadmap (new missions, squad orders, weapons, co-op with invite links) are in [`docs/GAME_PLAN.md`](docs/GAME_PLAN.md).
+
+## Testing
+
+```bash
+npx playwright install chromium   # once
+npm run test:campaign             # a bot plays all six missions in headless Chromium
+npm run test:campaign -- 0 3      # only missions 1 and 4
+```
+
+The test checks the start screen, prologue skip, every menu screen, each mission's completion, debrief XP, the promotions, the epilogue, saving across a reload, and that there are no page errors.
+
 ## Two versions
 
 - **Unity (first-person, IGI-style)**: [`unity/WanniFront`](unity/WanniFront/README.md). Stealth AI with detection meters, camp alarms, watchtowers, binoculars with enemy marking, a tactical map, a T-56 rifle, a suppressed pistol, an SVD sniper rifle and grenades, Unity Terrain with grass, and rain or a different time of day per mission. Open it with Unity 6 LTS and press Play.

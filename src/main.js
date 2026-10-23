@@ -5,6 +5,12 @@ import { Audio } from './audio.js';
 import { FX } from './fx.js';
 import { Input } from './input.js';
 import { MISSIONS } from './missions.js';
+import { Prologue } from './cinematic.js';
+import { Profile } from './profile.js';
+import { Radio } from './radio.js';
+import {
+  CHARACTERS, CLOSING, HISTORY_TIMELINE, HUMAN_COST, MEDALS, PROLOGUE, RANKS, SOURCES, SQUAD_EPILOGUE, STORY, nextRank,
+} from './story.js';
 import { Unit } from './units.js';
 import { World } from './world.js';
 
@@ -28,9 +34,14 @@ class Game {
     this.clock = new THREE.Clock();
     this.state = 'loading';
     this.time = 0;
-    this.difficulty = 1;
     this.units = [];
-    this.progress = this.loadProgress();
+    this.profile = new Profile(MISSIONS.map((m) => m.id));
+    this.difficulty = this.profile.settings.difficulty;
+    this.audio.setVolume(this.profile.settings.volume);
+    this.radio = new Radio($('.radio'), this.audio);
+    this.prologue = new Prologue(this);
+    this.cinematic = null;
+    this.flags = {};
     this.resize();
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('pointerlockchange', () => {
@@ -40,15 +51,13 @@ class Game {
     this.renderer.setAnimationLoop(() => this.frame());
   }
 
-  // ------------------------------------------------------------ persistence
+  // ------------------------------------------------------------ settings
 
-  loadProgress() {
-    try { return JSON.parse(localStorage.getItem('wanni_front_progress')) || { unlocked: 0, done: [] }; }
-    catch { return { unlocked: 0, done: [] }; }
-  }
-
-  saveProgress() {
-    try { localStorage.setItem('wanni_front_progress', JSON.stringify(this.progress)); } catch { /* storage unavailable */ }
+  applyQuality() {
+    const low = this.profile.settings.quality === 'low';
+    this.renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio, 2));
+    if (this.world) this.world.sun.castShadow = !low;
+    this.resize();
   }
 
   // ------------------------------------------------------------ UI
@@ -75,36 +84,188 @@ class Game {
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (!act) return;
       this.audio.init();
-      if (act === 'begin') this.beginMission();
-      if (act === 'menu') this.showMenu();
-      if (act === 'resume') this.resume();
-      if (act === 'restart') { this.startMission(this.missionIndex); this.beginMission(); }
-      if (act === 'next') {
-        if (this.missionIndex + 1 < MISSIONS.length) this.openBriefing(this.missionIndex + 1);
-        else this.showEpilogue();
-      }
+      this.audio.click();
+      const actions = {
+        start: () => this.startGame(),
+        begin: () => this.beginMission(),
+        menu: () => this.showMenu(),
+        resume: () => this.resume(),
+        restart: () => { this.startMission(this.missionIndex); this.beginMission(); },
+        next: () => this.afterDebrief(),
+        'promo-next': () => this.nextAfterMission(),
+        continue: () => this.continueCampaign(),
+        newcampaign: () => this.playPrologue(() => this.openBriefing(0)),
+        prologue: () => this.playPrologue(() => this.showMenu()),
+        missions: () => this.showMissions(),
+        squad: () => this.showSquad(),
+        profile: () => this.showProfile(),
+        archive: () => this.showArchive(),
+        settings: () => this.showSettings(),
+        credits: () => this.show('credits'),
+        reset: () => {
+          if (window.confirm('Reset all campaign progress, XP and commendations? Settings are kept.')) {
+            this.profile.reset();
+            this.showProfile();
+          }
+        },
+      };
+      actions[act]?.();
     });
-    $('#difficulty').addEventListener('change', (e) => { this.difficulty = parseFloat(e.target.value); });
+    const bindRange = (id, out, key, fmt) => {
+      const el = $(id);
+      el.addEventListener('input', () => {
+        this.profile.setSetting(key, parseFloat(el.value));
+        $(out).textContent = fmt(parseFloat(el.value));
+        if (key === 'volume') this.audio.setVolume(this.profile.settings.volume);
+      });
+    };
+    bindRange('#set-sens', '#out-sens', 'sensitivity', (v) => `${v.toFixed(2)}×`);
+    bindRange('#set-vol', '#out-vol', 'volume', (v) => `${Math.round(v * 100)}%`);
+    $('#set-diff').addEventListener('change', (e) => {
+      this.profile.setSetting('difficulty', parseFloat(e.target.value));
+      this.difficulty = this.profile.settings.difficulty;
+    });
+    $('#set-quality').addEventListener('change', (e) => {
+      this.profile.setSetting('quality', e.target.value);
+      this.applyQuality();
+    });
+    // arrow keys move between the buttons of the open menu
+    window.addEventListener('keydown', (e) => {
+      if (!['ArrowDown', 'ArrowUp'].includes(e.code) || $('#screen').classList.contains('hidden')) return;
+      const panel = [...document.querySelectorAll('#screen .panel')].find((p) => !p.classList.contains('hidden'));
+      const btns = [...(panel?.querySelectorAll('button:not(:disabled)') || [])];
+      if (!btns.length) return;
+      const i = btns.indexOf(document.activeElement);
+      const n = e.code === 'ArrowDown' ? (i + 1) % btns.length : (i - 1 + btns.length) % btns.length;
+      btns[i < 0 ? 0 : n].focus();
+      e.preventDefault();
+    });
     this.canvas.addEventListener('click', () => {
       if (this.state === 'playing' && !this.input.locked) this.input.requestLock();
     });
     if (this.input.touch) $('#hud').classList.add('touch-mode');
   }
 
-  showMenu() {
-    this.state = 'menu';
-    if (document.pointerLockElement) document.exitPointerLock();
+  focusFirst() {
+    const panel = [...document.querySelectorAll('#screen .panel')].find((p) => !p.classList.contains('hidden'));
+    panel?.querySelector('button:not(:disabled)')?.focus({ preventScroll: true });
+  }
+
+  startGame() {
+    this.audio.init();
+    if (!this.profile.data.seenPrologue) this.playPrologue(() => this.showMenu());
+    else this.showMenu();
+  }
+
+  playPrologue(then) {
+    this.profile.data.seenPrologue = true;
+    this.profile.save();
+    this.prologue.play(then);
+  }
+
+  continueCampaign() {
+    const d = this.profile.data;
+    const next = MISSIONS.findIndex((m) => !d.done.includes(m.id));
+    if (next === -1) this.showEpilogue();
+    else this.openBriefing(next);
+  }
+
+  // ------------------------------------------------------------ menu screens
+
+  rankCardHTML() {
+    const xp = this.profile.xp, r = this.profile.rank, nx = nextRank(xp);
+    const pct = nx ? Math.round(((xp - r.xp) / (nx.xp - r.xp)) * 100) : 100;
+    return `<div class="insignia">${this.insignia(r)}</div>
+      <div class="rc-name">${r.short} Awan</div>
+      <div class="rc-sub">${r.name} · ${xp.toLocaleString()} XP</div>
+      <div class="xpbar"><div style="width:${pct}%"></div></div>
+      <div class="rc-sub">${nx ? `${(nx.xp - xp).toLocaleString()} XP to ${nx.name}` : 'Highest rank reached'}</div>`;
+  }
+
+  insignia(rank) {
+    if (rank.emblem) {
+      return '<svg viewBox="0 0 120 60"><circle cx="60" cy="30" r="20" fill="#e0b84a" stroke="#7a5a1a" stroke-width="2"/><text x="60" y="37" text-anchor="middle" font-size="20" fill="#3a2a0a">🦁</text></svg>';
+    }
+    const pips = [];
+    for (let i = 0; i < rank.pips; i++) {
+      const cx = 60 + (i - (rank.pips - 1) / 2) * 34;
+      pips.push(`<g transform="translate(${cx},30)"><polygon points="0,-16 4,-5 16,-5 6,2 10,14 0,7 -10,14 -6,2 -16,-5 -4,-5" fill="#e0b84a" stroke="#7a5a1a" stroke-width="1.5"/></g>`);
+    }
+    return `<svg viewBox="0 0 120 60">${pips.join('')}</svg>`;
+  }
+
+  showMissions() {
     const list = $('.missions');
     list.innerHTML = '';
+    const d = this.profile.data;
     MISSIONS.forEach((m, i) => {
       const b = document.createElement('button');
       b.className = 'mcard';
-      b.disabled = i > this.progress.unlocked;
-      b.innerHTML = `<div class="n">MISSION ${i + 1}</div><div class="t">${m.name}</div><div class="s">${m.si}</div><div class="d">${m.date}</div>${this.progress.done.includes(m.id) ? '<div class="done">✔ Completed</div>' : ''}`;
+      b.disabled = i > d.unlocked;
+      const best = d.best[m.id];
+      b.innerHTML = `<div class="n">MISSION ${i + 1}</div><div class="t">${m.name}</div><div class="s">${m.si}</div><div class="d">${m.date}</div>${d.done.includes(m.id) ? `<div class="done">✔ Completed · best ${best} XP</div>` : ''}`;
       b.addEventListener('click', () => { this.audio.init(); this.openBriefing(i); });
       list.appendChild(b);
     });
+    this.show('missions');
+    this.focusFirst();
+  }
+
+  showSquad() {
+    $('.squad-list').innerHTML = ['ruwan', 'nimal', 'kasun', 'prakash', 'sunil'].map((k) => {
+      const c = CHARACTERS[k];
+      return `<div class="squad-card"><div class="n" style="color:${c.color}">${c.name}</div><div class="r">${c.role}</div><p>${c.bio}</p></div>`;
+    }).join('');
+    this.show('squad');
+    this.focusFirst();
+  }
+
+  showProfile() {
+    const d = this.profile.data;
+    $('.profile-head').innerHTML = `<div class="insignia">${this.insignia(this.profile.rank)}</div><div style="flex:1">${this.rankCardHTML().replace(/<div class="insignia">.*?<\/div>/, '')}</div>`;
+    $('.profile-missions').innerHTML = MISSIONS.map((m, i) => `<div class="pm ${d.done.includes(m.id) ? 'done' : ''}"><b>${i + 1}. ${m.name}</b>${d.done.includes(m.id) ? `✔ best ${d.best[m.id] || 0} XP` : i <= d.unlocked ? 'Unlocked' : 'Locked'}</div>`).join('');
+    $('.medal-grid').innerHTML = Object.entries(MEDALS).map(([id, m]) => `<div class="medal ${d.medals.includes(id) ? 'on' : ''}"><div class="ico"></div><div><b>${m.name}</b>${m.desc}</div></div>`).join('');
+    this.show('profile');
+    this.focusFirst();
+  }
+
+  showArchive() {
+    $('.archive-body').innerHTML = `
+      <p>Wanni Front separates <span class="tag history">Historical record</span> from <span class="tag fiction">Fiction</span>. Dates, places, formations and outcomes come from the sources below. The squad, its dialogue and its individual firefights are invented. Where sources disagree — for example on whether the Mavil Aru gates reopened on 8 or 10 August 2006 — the game says so. Many accounts from 2008–2009 are official or government-aligned; others, including the UN Panel of Experts, are strongly disputed by the government. Read widely.</p>
+      <h3>Timeline</h3>
+      <ul class="timeline">${HISTORY_TIMELINE.map(([d, t], i) => `<li style="animation-delay:${i * 0.06}s"><b>${d}</b>${t}</li>`).join('')}</ul>
+      <h3>The human cost</h3>
+      ${HUMAN_COST.map((t) => `<p>${t}</p>`).join('')}
+      <h3>Sources</h3>
+      <ol class="sources">${SOURCES.map(([t, u]) => `<li>${u ? `<a href="${u}" target="_blank" rel="noopener">${t}</a>` : t}</li>`).join('')}</ol>`;
+    this.show('archive');
+    this.focusFirst();
+  }
+
+  showSettings() {
+    const st = this.profile.settings;
+    $('#set-sens').value = st.sensitivity;
+    $('#out-sens').textContent = `${st.sensitivity.toFixed(2)}×`;
+    $('#set-vol').value = st.volume;
+    $('#out-vol').textContent = `${Math.round(st.volume * 100)}%`;
+    $('#set-diff').value = String(st.difficulty);
+    $('#set-quality').value = st.quality;
+    this.show('settings');
+    this.focusFirst();
+  }
+
+  showMenu() {
+    if (this.state === 'cinematic') return;
+    this.state = 'menu';
+    this.radio.clear();
+    if (document.pointerLockElement) document.exitPointerLock();
+    const d = this.profile.data;
+    const next = MISSIONS.findIndex((m) => !d.done.includes(m.id));
+    $('.m-continue').textContent = d.done.length === 0 ? 'Begin at Mavil Aru, 2006'
+      : next === -1 ? 'Campaign complete — view the epilogue' : `Next: Mission ${next + 1} — ${MISSIONS[next].name}`;
+    $('.rank-card').innerHTML = this.rankCardHTML();
     this.show('menu');
+    this.focusFirst();
   }
 
   openBriefing(i) {
@@ -117,7 +278,11 @@ class Game {
     $('.b-place').textContent = m.place;
     $('.b-text').innerHTML = m.briefing.map((p) => `<p>${p}</p>`).join('');
     $('.b-objs').innerHTML = m.objectives.map((o) => `<li>${o.text}</li>`).join('');
+    const st = STORY[m.id];
+    $('.b-fiction').textContent = `${this.profile.rank.short} Awan. ${st.briefing}`;
+    $('.b-squad').innerHTML = st.squad.map((k) => `<span class="chip" style="border-color:${CHARACTERS[k].color}">${CHARACTERS[k].short} · ${CHARACTERS[k].role}</span>`).join('');
     this.show('briefing');
+    this.focusFirst();
   }
 
   beginMission() {
@@ -126,6 +291,9 @@ class Game {
     this.input.requestLock();
     this.input.resetLook();
     this.toast(`${this.mission.name.toUpperCase()} — ${this.mission.date}`, true);
+    this.audio.stinger(true);
+    this.radio.clear();
+    this.radio.say(STORY[this.mission.id].intro);
     this.activateObjective(0);
   }
 
@@ -146,9 +314,17 @@ class Game {
 
   showEpilogue() {
     this.state = 'epilogue';
+    this.radio.clear();
     if (document.pointerLockElement) document.exitPointerLock();
-    $('.e-text').innerHTML = MISSIONS[MISSIONS.length - 1].epilogue.map((p) => `<p>${p}</p>`).join('');
+    $('.e-text').innerHTML = `
+      <span class="tag history">Historical record</span>
+      <ul class="timeline">${HISTORY_TIMELINE.map(([d, t], i) => `<li style="animation-delay:${0.3 + i * 0.45}s"><b>${d}</b>${t}</li>`).join('')}</ul>
+      ${HUMAN_COST.map((t) => `<p>${t}</p>`).join('')}
+      <span class="tag fiction">Your section — fiction</span>
+      <ul class="e-squad">${SQUAD_EPILOGUE.map(([k, t]) => `<li><b style="color:${CHARACTERS[k].color}">${k === 'awan' ? `${this.profile.rank.short} Awan` : CHARACTERS[k].short}</b> — ${t}</li>`).join('')}</ul>
+      <div class="closing">${CLOSING}</div>`;
     this.show('epilogue');
+    this.focusFirst();
   }
 
   toast(text, big = false) {
@@ -178,8 +354,10 @@ class Game {
     const m = this.mission;
     this.player = new Unit(this, 'army', m.player.x, m.player.z, { player: true, yaw: Math.PI });
     this.units = [this.player];
+    const squad = STORY[m.id].squad;
     for (let k = 0; k < m.allies; k++) {
-      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI });
+      const name = squad[k] ? CHARACTERS[squad[k]].short : undefined;
+      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI, name });
       this.units.push(a);
     }
     let idx = 10;
@@ -192,6 +370,10 @@ class Game {
     this.escortZone = m.objectives.find((o) => o.type === 'escort')?.zone || [0, 0, 10];
     this.civTotal = this.units.filter((u) => u.team === 'civ').length;
     this.civSafe = 0;
+    this.civIncidents = 0;
+    this.flags = {};
+    this.radio.clear();
+    this.applyQuality();
 
     this.yaw = Math.PI;
     this.pitch = 0;
@@ -244,9 +426,10 @@ class Game {
         this.units.push(u);
       }
     }
-    $('.obj-mission').textContent = `${this.mission.name} · Objective ${i + 1}/${this.mission.objectives.length}`;
+    $('.obj-mission').textContent = `${this.profile.rank.short} Awan · ${this.mission.name} · Objective ${i + 1}/${this.mission.objectives.length}`;
     $('.obj-text').textContent = o.text;
     if (i > 0) this.toast(`New objective: ${o.text}`);
+    this.radio.say(STORY[this.mission.id].objectives[i]);
   }
 
   checkObjective() {
@@ -311,22 +494,93 @@ class Game {
   }
 
   missionComplete() {
-    this.endTimer = 2.5;
+    this.radio.say(STORY[this.mission.id].outro);
+    this.endTimer = Math.min(10, Math.max(2.5, this.radio.remaining + 0.6));
     this.endAction = () => {
       const m = this.mission;
-      if (!this.progress.done.includes(m.id)) this.progress.done.push(m.id);
-      this.progress.unlocked = Math.max(this.progress.unlocked, Math.min(MISSIONS.length - 1, this.missionIndex + 1));
-      this.saveProgress();
+      const acc = this.shots ? Math.round((this.hits / this.shots) * 100) : 0;
+      const rec = this.profile.recordMission(this.missionIndex, {
+        objectives: m.objectives.length, accuracy: acc, difficulty: this.difficulty,
+        hasCivilians: this.civTotal > 0, civilianIncidents: this.civIncidents,
+      });
+      this.lastRecord = rec;
       this.state = 'complete';
+      this.radio.clear();
+      this.audio.stinger(m.id !== 'nandikadal');
       if (document.pointerLockElement) document.exitPointerLock();
       $('.c-title').textContent = `${m.name} — ${m.date}`;
       $('.c-text').textContent = m.debrief;
-      const acc = this.shots ? Math.round((this.hits / this.shots) * 100) : 0;
+      $('.c-fiction').textContent = STORY[m.id].debrief;
       const mins = Math.floor(this.missionTime / 60), secs = Math.floor(this.missionTime % 60).toString().padStart(2, '0');
       $('.c-stats').textContent = `Time ${mins}:${secs} · Hostiles neutralised ${this.kills} · Accuracy ${acc}%`;
-      $('[data-act="next"]').textContent = this.missionIndex + 1 < MISSIONS.length ? 'Next mission' : 'Epilogue';
+      const nx = nextRank(rec.totalXP);
+      $('.xp-box').innerHTML = `${rec.lines.map(([t, v]) => `<div class="xp-line"><span>${t}</span><span>+${v}</span></div>`).join('')}
+        <div class="xp-line total"><span>Mission XP</span><span>${rec.missionXP}</span></div>
+        <div class="xp-line"><span>${rec.previousBest ? `Previous best ${rec.previousBest} · counted once` : 'First completion'}</span><span>+${rec.gained} total</span></div>
+        <div class="xpbar"><div style="width:${nx ? Math.round(((rec.totalXP - rec.newRank.xp) / (nx.xp - rec.newRank.xp)) * 100) : 100}%"></div></div>
+        <div class="xp-line"><span>${rec.newRank.name} · ${rec.totalXP.toLocaleString()} XP</span><span>${nx ? `${(nx.xp - rec.totalXP).toLocaleString()} to ${nx.short}` : ''}</span></div>
+        ${rec.newMedals.map((id) => `<div class="new-medal">★ Commendation: ${MEDALS[id].name}</div>`).join('')}`;
+      $('[data-act="next"]').textContent = this.missionIndex + 1 < MISSIONS.length ? 'Continue' : 'Epilogue';
       this.show('complete');
+      this.focusFirst();
     };
+  }
+
+  afterDebrief() {
+    const rec = this.lastRecord;
+    if (rec && rec.newRank.id !== rec.oldRank.id && this.missionIndex + 1 < MISSIONS.length) this.showPromotion(rec.newRank);
+    else this.nextAfterMission();
+  }
+
+  nextAfterMission() {
+    this.stopConfetti = true;
+    if (this.missionIndex + 1 < MISSIONS.length) this.openBriefing(this.missionIndex + 1);
+    else this.showEpilogue();
+  }
+
+  showPromotion(rank) {
+    this.state = 'promotion';
+    $('.panel[data-screen="promotion"] .insignia').innerHTML = this.insignia(rank);
+    $('.promo-rank').textContent = `${rank.name} Awan`;
+    const lines = {
+      lt: [['ruwan', 'Two pips now, Sir. Don\'t let it go to your head — it\'s heavy enough already.'], ['nimal', 'I found a pot of kiribath in the cookhouse. Nobody ask me how.'], ['kasun', 'Congratulations, Sir. I\'m writing to my sister about this.']],
+      capt: [['ruwan', 'Captain Awan. My brother will want to hear this.'], ['nimal', 'Kiribath, lunu miris and tea for everyone — the Captain is paying!'], ['prakash', 'Tonight we celebrate. Tomorrow we go north again.']],
+      maj: [['ruwan', 'Major. I always knew, Sir.']],
+    }[rank.id] || [];
+    $('.promo-lines').innerHTML = lines.map(([k, t]) => `<p><b style="color:${CHARACTERS[k].color}">${CHARACTERS[k].short}:</b> ${t}</p>`).join('')
+      + '<p class="note">The section celebrates at camp with kiribath and tea.</p>';
+    this.show('promotion');
+    this.audio.stinger(true);
+    this.confetti($('.confetti'));
+    this.focusFirst();
+  }
+
+  confetti(cv) {
+    const ctx = cv.getContext('2d');
+    const colors = ['#e0b84a', '#9bd16a', '#e0573a', '#7fc8e8', '#f2eedf'];
+    const bits = Array.from({ length: 140 }, () => ({
+      x: Math.random(), y: -Math.random() * 0.6, vx: (Math.random() - 0.5) * 0.004, vy: 0.003 + Math.random() * 0.005,
+      r: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.3, c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    this.stopConfetti = false;
+    const tick = () => {
+      if (this.stopConfetti || this.state !== 'promotion') return;
+      cv.width = cv.clientWidth;
+      cv.height = cv.clientHeight;
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      for (const b of bits) {
+        b.x += b.vx; b.y += b.vy; b.r += b.vr;
+        if (b.y > 1.05) { b.y = -0.05; b.x = Math.random(); }
+        ctx.save();
+        ctx.translate(b.x * cv.width, b.y * cv.height);
+        ctx.rotate(b.r);
+        ctx.fillStyle = b.c;
+        ctx.fillRect(-4, -2, 8, 4);
+        ctx.restore();
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
   }
 
   missionFailed(reason) {
@@ -343,7 +597,7 @@ class Game {
   // ------------------------------------------------------------ events
 
   onUnitKilled(u) {
-    if (u.isPlayer) { this.missionFailed('You were killed in action.'); return; }
+    if (u.isPlayer) { this.radio.clear(); this.missionFailed('You were killed in action.'); return; }
     if (u.team === 'civ') { this.missionFailed('A civilian was killed. Protecting civilians is your first duty.'); return; }
     if (u.team === 'ltte') this.killfeed('LTTE cadre neutralised');
   }
@@ -351,10 +605,19 @@ class Game {
   onCivilianSafe() {
     this.civSafe++;
     this.toast(`Civilian reached safety (${this.civSafe}/${this.civTotal})`);
+    if (this.civSafe >= this.civTotal) this.storyEvent('allSafe');
+  }
+
+  // play a mission's event dialogue once per mission
+  storyEvent(name) {
+    if (this.flags[name]) return;
+    this.flags[name] = true;
+    this.radio.say(STORY[this.mission.id].events?.[name]);
   }
 
   onPlayerHit(from) {
     this.lastPlayerHit = this.time;
+    if (this.player.hp < 70) this.storyEvent('hurt');
     $('.vignette').style.opacity = String(Math.min(1, 0.35 + (1 - this.player.hp / 100) * 0.6));
     this.alertLevel = 8;
     void from;
@@ -378,7 +641,7 @@ class Game {
     if (!p.alive) { p.update(dt); p.sync(dt); return; }
 
     const look = inp.consumeLook();
-    const sens = (inp.aim ? 0.0011 : 0.0022);
+    const sens = (inp.aim ? 0.0011 : 0.0022) * this.profile.settings.sensitivity;
     this.yaw -= look.x * sens;
     this.pitch = THREE.MathUtils.clamp(this.pitch - look.y * sens, -1.0, 0.75);
 
@@ -471,6 +734,8 @@ class Game {
         const aimed = this.world.raycast(origin, aimDir, 350, p);
         if (aimed?.unit === u) u.damage(40, p);
         if (u.alive) this.toast('HOLD FIRE — civilians!', true);
+        this.civIncidents++;
+        this.storyEvent('civilianWarning');
       } else {
         this.hits++;
         const dmg = res.head ? 120 : 36;
@@ -690,6 +955,8 @@ class Game {
       for (const u of this.units) if (!u.isPlayer) u.update(dt);
       this.alertLevel = Math.max(0, this.alertLevel - dt);
       this.updateShelling(dt);
+      this.radio.update(dt);
+      if (!this.flags.contact && this.units.some((u) => u.team === 'ltte' && u.alive && u.state === 'combat')) this.storyEvent('contact');
       for (const c of this.charges) if ((c.timer -= dt) <= 0) this.detonate(c.target);
       this.charges = this.charges.filter((c) => c.timer > 0);
       this.checkObjective();
@@ -705,7 +972,12 @@ class Game {
         const u = this.units[i];
         if (!u.alive && !u.isPlayer && u.deadTime > 30) { u.remove(); this.units.splice(i, 1); }
       }
-    } else if (this.world && ['briefing', 'menu', 'complete', 'failed', 'epilogue'].includes(this.state)) {
+    } else if (this.state === 'cinematic' && this.cinematic) {
+      this.time += dt;
+      this.cinematic.update(dt);
+      for (const u of this.units) u.sync(0);
+      this.fx.update(dt);
+    } else if (this.world && this.player && this.state !== 'pause') {
       // slow orbit behind menus
       this.time += dt;
       const p = this.player.pos;
@@ -724,8 +996,10 @@ const game = new Game();
 window.__game = game;
 loadModels((k) => { $('.loading-bar div').style.width = `${Math.round(k * 100)}%`; })
   .then(() => {
-    game.startMission(Math.min(game.progress.unlocked, MISSIONS.length - 1));
-    game.showMenu();
+    game.startMission(Math.min(game.profile.data.unlocked, MISSIONS.length - 1));
+    game.state = 'start';
+    game.show('start');
+    game.focusFirst();
   })
   .catch((err) => {
     console.error(err);

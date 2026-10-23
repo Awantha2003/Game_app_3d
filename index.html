@@ -25,6 +25,7 @@
     <div class="prompt"><div class="prompt-text"></div><div class="prompt-bar"><div></div></div></div>
     <div class="toasts"></div>
     <div class="killfeed"></div>
+    <div class="radio"></div>
     <div class="status">
       <div class="hp"><div class="hp-label">HEALTH</div><div class="hp-bar"><div></div></div></div>
     </div>
@@ -46,6 +47,9 @@
     <button class="tbtn btn-pause">II</button>
   </div>
 
+  <!-- opening cinematic -->
+  <div id="prologue" class="hidden"></div>
+
   <!-- screens -->
   <div id="screen" class="screen">
     <div class="panel menu" data-screen="loading">
@@ -54,49 +58,164 @@
       <div class="loading"><div class="loading-bar"><div></div></div><div class="loading-text">Loading Blender models…</div></div>
     </div>
 
-    <div class="panel menu hidden" data-screen="menu">
+    <div class="panel menu center hidden" data-screen="start">
       <div class="eyebrow">Eelam War IV · 2006 – 2009</div>
       <h1>WANNI FRONT</h1>
       <div class="si">වන්නි සටන් බිම</div>
-      <p class="lede">A third-person campaign following the Sri Lanka Army through six real operations of the final phase of the civil war — from Mavil Aru to Nandikadal.</p>
+      <button class="btn primary big" data-act="start">Click to start</button>
+      <p class="note">Sound on recommended. The game uses your mouse — press Esc any time to pause and free the cursor.</p>
+    </div>
+
+    <div class="panel menu mainmenu hidden" data-screen="menu">
+      <div class="eyebrow">Eelam War IV · 2006 – 2009</div>
+      <h1>WANNI FRONT</h1>
+      <div class="si">වන්නි සටන් බිම</div>
+      <div class="menu-grid">
+        <div class="menu-list">
+          <button class="mbtn" data-act="continue"><span>Continue Campaign</span><small class="m-continue"></small></button>
+          <button class="mbtn" data-act="newcampaign"><span>New Campaign</span><small>Watch the prologue and start at Mavil Aru</small></button>
+          <button class="mbtn" data-act="missions"><span>Mission Selection</span><small>Replay any unlocked operation</small></button>
+          <button class="mbtn" data-act="squad"><span>Squad</span><small>Meet your section</small></button>
+          <button class="mbtn" data-act="profile"><span>Player Profile</span><small>Rank, XP and commendations</small></button>
+          <button class="mbtn" data-act="archive"><span>Historical Archive</span><small>Timeline, human cost and sources</small></button>
+          <button class="mbtn" data-act="settings"><span>Settings</span><small>Controls, sound, graphics</small></button>
+          <button class="mbtn" data-act="credits"><span>Credits</span></button>
+          <button class="mbtn" disabled><span>Loadout</span><small class="planned">Planned — not available yet</small></button>
+          <button class="mbtn" disabled><span>Multiplayer (co-op)</span><small class="planned">Planned — not available yet</small></button>
+        </div>
+        <div class="menu-side">
+          <div class="rank-card"></div>
+          <p class="note">Based on public historical records. The squad and its story are fictional. Respect for all who lost their lives — soldiers, cadres and civilians.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel hidden" data-screen="missions">
+      <div class="eyebrow">Campaign</div>
+      <h2>Mission Selection</h2>
       <div class="missions"></div>
-      <div class="row">
+      <div class="row"><button class="btn" data-act="menu">Back</button></div>
+    </div>
+
+    <div class="panel wide hidden" data-screen="squad">
+      <div class="eyebrow">Fiction</div>
+      <h2>Your Section</h2>
+      <p class="note">These characters are invented for the game.</p>
+      <div class="squad-list"></div>
+      <div class="row"><button class="btn" data-act="menu">Back</button></div>
+    </div>
+
+    <div class="panel wide hidden" data-screen="profile">
+      <div class="eyebrow">Player profile</div>
+      <div class="profile-head"></div>
+      <h3>Operations</h3>
+      <div class="profile-missions"></div>
+      <h3>Commendations</h3>
+      <div class="medal-grid"></div>
+      <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn danger" data-act="reset">Reset progress</button></div>
+    </div>
+
+    <div class="panel wide hidden" data-screen="archive">
+      <div class="eyebrow">Historical Archive</div>
+      <h2>Eelam War IV in context</h2>
+      <div class="archive-body"></div>
+      <div class="row"><button class="btn" data-act="menu">Back</button></div>
+    </div>
+
+    <div class="panel hidden" data-screen="settings">
+      <div class="eyebrow">Settings</div>
+      <h2>Settings</h2>
+      <div class="settings">
+        <label>Mouse sensitivity <input type="range" id="set-sens" min="0.3" max="3" step="0.05" /><output id="out-sens"></output></label>
+        <label>Volume <input type="range" id="set-vol" min="0" max="1" step="0.05" /><output id="out-vol"></output></label>
         <label>Difficulty
-          <select id="difficulty">
+          <select id="set-diff">
             <option value="0.6">Recruit</option>
-            <option value="1" selected>Soldier</option>
+            <option value="1">Soldier</option>
             <option value="1.45">Veteran</option>
+          </select>
+        </label>
+        <label>Graphics
+          <select id="set-quality">
+            <option value="high">High (shadows, sharp)</option>
+            <option value="low">Low (faster)</option>
           </select>
         </label>
       </div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse aim · Left click fire · Right click aim down sights · Shift sprint · R reload · E interact · Esc pause
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim · Shift sprint · R reload · E interact · Esc pause
       </div>
-      <p class="note">Based on public historical records. Respect for all who lost their lives — soldiers, cadres and civilians.</p>
+      <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn" data-act="prologue">Watch prologue</button></div>
     </div>
 
-    <div class="panel briefing hidden" data-screen="briefing">
+    <div class="panel hidden" data-screen="credits">
+      <div class="eyebrow">Credits</div>
+      <h2>Wanni Front</h2>
+      <div class="credits-body">
+        <p><b>Created by</b> Awantha — idea, story direction and design.</p>
+        <p><b>Code, Blender models, sound and writing</b> built with Claude (Anthropic).</p>
+        <p><b>Engine</b> three.js (MIT) · Vite (MIT).</p>
+        <p><b>Fonts</b> Oswald, Inter, Noto Sans Sinhala (Google Fonts, SIL Open Font License).</p>
+        <p>All 3D models are generated in Blender by <code>blender/build_assets.py</code>. All sounds are synthesised in the browser. No assets from commercial games are used.</p>
+        <p>Characters and dialogue are fictional. Historical text is based on the sources in the Historical Archive.</p>
+      </div>
+      <div class="row"><button class="btn" data-act="menu">Back</button></div>
+    </div>
+
+    <div class="panel wide briefing hidden" data-screen="briefing">
       <div class="eyebrow b-date"></div>
       <h2 class="b-title"></h2>
       <div class="si b-si"></div>
       <div class="b-place"></div>
-      <div class="b-text"></div>
-      <div class="b-objs-title">Objectives</div>
-      <ol class="b-objs"></ol>
+      <div class="b-cols">
+        <div>
+          <div class="tag history">Historical record</div>
+          <div class="b-text"></div>
+        </div>
+        <div>
+          <div class="tag fiction">Your section — fiction</div>
+          <p class="b-fiction"></p>
+          <div class="b-squad"></div>
+          <div class="b-objs-title">Objectives</div>
+          <ol class="b-objs"></ol>
+        </div>
+      </div>
       <div class="row"><button class="btn primary" data-act="begin">Begin mission</button><button class="btn" data-act="menu">Back</button></div>
     </div>
 
     <div class="panel hidden" data-screen="pause">
       <h2>Paused</h2>
       <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
+      <div class="controls">
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim · Shift sprint · R reload · E interact · Esc pause
+      </div>
     </div>
 
-    <div class="panel hidden" data-screen="complete">
-      <div class="eyebrow">Mission complete</div>
+    <div class="panel wide hidden" data-screen="complete">
+      <div class="eyebrow">Mission complete · Debrief</div>
       <h2 class="c-title"></h2>
-      <p class="c-text"></p>
-      <div class="c-stats"></div>
+      <div class="b-cols">
+        <div>
+          <div class="tag history">Historical record</div>
+          <p class="c-text"></p>
+          <div class="tag fiction">Your section — fiction</div>
+          <p class="c-fiction"></p>
+        </div>
+        <div>
+          <div class="c-stats"></div>
+          <div class="xp-box"></div>
+        </div>
+      </div>
       <div class="row"><button class="btn primary" data-act="next">Continue</button><button class="btn" data-act="menu">Menu</button></div>
+    </div>
+
+    <div class="panel center hidden" data-screen="promotion">
+      <canvas class="confetti"></canvas>
+      <div class="eyebrow">Promoted</div>
+      <div class="insignia"></div>
+      <h2 class="promo-rank"></h2>
+      <div class="promo-lines"></div>
+      <div class="row"><button class="btn primary" data-act="promo-next">Continue</button></div>
     </div>
 
     <div class="panel hidden" data-screen="failed">
@@ -105,11 +224,11 @@
       <div class="row"><button class="btn primary" data-act="restart">Retry</button><button class="btn" data-act="menu">Menu</button></div>
     </div>
 
-    <div class="panel hidden" data-screen="epilogue">
-      <div class="eyebrow">18 – 19 May 2009</div>
+    <div class="panel wide hidden" data-screen="epilogue">
+      <div class="eyebrow">Epilogue · Remember and Rebuild</div>
       <h2>The end of the war</h2>
       <div class="e-text"></div>
-      <div class="row"><button class="btn primary" data-act="menu">Main menu</button></div>
+      <div class="row"><button class="btn primary" data-act="menu">Main menu</button><button class="btn" data-act="archive">Historical Archive</button></div>
     </div>
   </div>
 

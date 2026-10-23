@@ -18,7 +18,7 @@ export const MISSIONS = [
     place: 'Trincomalee District, Eastern Province',
     briefing: [
       'On 21 July 2006 the LTTE closed the sluice gates of the Mavil Aru anicut, cutting off irrigation water to thousands of farming families downstream.',
-      'Talks brokered by the Sri Lanka Monitoring Mission failed. After air strikes on 26 July, ground troops moved in to reopen the gates. The gates were opened again on 8 August 2006.',
+      'Talks brokered by the Sri Lanka Monitoring Mission failed. After air strikes on 26 July, ground troops moved in to reopen the gates. The gates were reopened in early August 2006 (sources give 8 or 10 August).',
       'The fighting at Mavil Aru is generally seen as the start of Eelam War IV.',
     ],
     debrief: 'With the water flowing again, the army pushed on through the East: Sampur fell in September 2006 and Vakarai in January 2007.',
