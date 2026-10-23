@@ -422,73 +422,99 @@ def soldier(name, cloth_tex, skin, faction, hat=None, paint=False, ghillie=False
     hair = mat("hair", "#0f0d0b", 0.9)
 
     root = empty("Soldier")
+    army = faction == "army"
+    olive = mat("kit_olive", "#4a4c30" if army else "#3a3826", 0.9)
+    strap = mat("strap", "#2e3020" if army else "#25241a", 0.85)
+    brow = mat("brow", "#14100c", 0.9)
 
-    pelvis = Part("Pelvis")
-    pelvis.box(cloth, (0.36, 0.2, 0.2), (0, 0, 0.98))
-    pelvis.box(gear, (0.38, 0.22, 0.05), (0, 0, 1.05))
+    pelvis = Part("Pelvis", 3.4)
+    pelvis.sphere(cloth, 0.19, (0, 0, 0.97), (1.0, 0.62, 0.62), seg=12)
+    pelvis.cyl(gear, 0.2, 0.05, (0, 0, 1.06), seg=14)
+    pelvis.box(strap, (0.05, 0.02, 0.045), (0, -0.125, 1.06))
+    pelvis.cyl(olive, 0.045, 0.14, (0.17, 0.05, 1.0), seg=8)  # water bottle
+    pelvis.box(gear, (0.08, 0.06, 0.1), (-0.15, 0.08, 1.0))  # utility pouch
     pelvis.finish(root)
 
     for side, x in (("L", 0.105), ("R", -0.105)):
-        leg = Part("Leg" + side)
-        leg.box(cloth, (0.15, 0.17, 0.5), (0, 0, -0.25))
-        leg.box(cloth, (0.13, 0.15, 0.4), (0, 0, -0.66))
-        leg.box(boot, (0.13, 0.27, 0.11), (0, -0.04, -0.895))
-        leg.box(boot, (0.135, 0.16, 0.12), (0, 0, -0.8))
+        sg = 1 if side == "L" else -1
+        leg = Part("Leg" + side, 3.4)
+        leg.cyl(cloth, 0.088, 0.5, (0, 0, -0.24), seg=10, r2=0.068)            # thigh
+        leg.box(cloth, (0.04, 0.12, 0.14), (sg * 0.075, -0.01, -0.3))           # cargo pocket
+        leg.sphere(cloth, 0.07, (0, -0.01, -0.5), (1, 1.1, 1), seg=8)          # knee
+        leg.cyl(cloth, 0.066, 0.34, (0, 0, -0.66), seg=10, r2=0.056)           # shin
+        leg.cyl(boot, 0.064, 0.13, (0, 0.0, -0.8), seg=10)                     # boot upper
+        leg.sphere(boot, 0.07, (0, -0.06, -0.88), (0.95, 1.8, 0.75), seg=10)   # toe
+        leg.box(boot, (0.12, 0.27, 0.03), (0, -0.04, -0.935))                  # sole
         leg.finish(root, (x, 0, 0.95))
 
-    torso = Part("Torso")
-    torso.box(cloth, (0.42, 0.24, 0.52), (0, 0, 0.27))
-    torso.box(gear, (0.44, 0.27, 0.26), (0, 0, 0.2))
-    for x in (-0.12, 0, 0.12):
-        torso.box(gear, (0.09, 0.06, 0.12), (x, -0.155, 0.17))
-    torso.box(gear, (0.34, 0.17, 0.38) if faction == "army" else (0.26, 0.12, 0.3),
-              (0, 0.2, 0.3))
-    if faction == "ltte":
-        # cyanide capsule cord and chest rig straps
-        torso.box(gear, (0.05, 0.25, 0.5), (0.12, 0, 0.3), (0, 0, -20))
+    torso = Part("Torso", 3.4)
+    torso.sphere(cloth, 0.2, (0, 0, 0.3), (1.06, 0.66, 1.42), seg=14)          # chest and belly
+    for sx in (-1, 1):
+        torso.sphere(cloth, 0.085, (sx * 0.19, 0, 0.47), seg=10)               # shoulders
+    torso.box(gear, (0.4, 0.27, 0.28), (0, 0, 0.24))                           # load-bearing vest
+    for sx in (-1, 1):
+        torso.box(strap, (0.06, 0.28, 0.24), (sx * 0.13, 0, 0.47), (0, 0, 0))  # vest shoulder straps
+    for x in (-0.13, 0, 0.13):                                                 # magazine pouches with flaps
+        torso.box(olive, (0.1, 0.06, 0.13), (x, -0.16, 0.18))
+        torso.box(gear, (0.105, 0.065, 0.03), (x, -0.165, 0.25))
+    if army:
+        torso.box(olive, (0.08, 0.05, 0.12), (0.13, -0.15, 0.36))              # radio / dressing pouch
+        torso.box(gear, (0.36, 0.2, 0.42), (0, 0.22, 0.3))                     # patrol pack
+        torso.box(olive, (0.3, 0.06, 0.18), (0, 0.33, 0.22))                   # outer pocket
+        torso.cyl(olive, 0.06, 0.38, (0, 0.24, 0.55), (0, 90, 0), seg=10)      # rolled poncho
+        torso.box(strap, (0.36, 0.02, 0.03), (0, 0.33, 0.33))
+    else:
+        torso.box(gear, (0.26, 0.12, 0.3), (0, 0.18, 0.3))
+        torso.box(gear, (0.05, 0.25, 0.5), (0.12, 0, 0.3), (0, 0, -20))       # chest rig straps
         torso.box(gear, (0.05, 0.25, 0.5), (-0.12, 0, 0.3), (0, 0, 20))
-    torso.cyl(skin_m, 0.055, 0.1, (0, 0, 0.56), seg=8)
+        torso.cyl(strap, 0.006, 0.18, (0, -0.15, 0.48), (20, 0, 0), seg=4)    # cord around the neck
+    torso.cyl(cloth, 0.075, 0.05, (0, 0, 0.53), seg=10)                       # collar
+    torso.cyl(skin_m, 0.052, 0.09, (0, 0, 0.58), seg=10)                      # neck
     if ghillie:
         ghillie_strips(torso, burlap, [(0, 0.05, 0.52, 0.2), (0.18, 0.08, 0.45, 0.08), (-0.18, 0.08, 0.45, 0.08),
                                        (0, 0.18, 0.4, 0.15)], 70, 0.45, 5)
-    else:
-        # bandolier across the chest
-        torso.box(gear, (0.06, 0.3, 0.62), (0, -0.02, 0.3), (0, 0, 0), )
     t = torso.finish(root, (0, 0, 1.0))
 
-    head = Part("Head")
-    head.sphere(face_m, 0.115, (0, 0, 0.11), (0.9, 1.0, 1.08))
-    head.box(face_m, (0.04, 0.05, 0.04), (0, -0.115, 0.1))
+    head = Part("Head", 3.4)
+    head.sphere(face_m, 0.112, (0, 0, 0.11), (0.88, 0.98, 1.1), seg=14)       # skull and face
+    head.sphere(face_m, 0.07, (0, -0.045, 0.04), (1.0, 0.9, 0.8), seg=10)     # jaw
+    head.prism(face_m, 0.035, 0.04, 0.01, 0.05, (0, -0.108, 0.1), (90, 0, 0))  # nose
+    for sx in (-1, 1):
+        head.sphere(face_m, 0.024, (sx * 0.098, 0, 0.1), (0.5, 1, 1.3), seg=6)  # ears
+        head.box(brow, (0.035, 0.012, 0.01), (sx * 0.035, -0.103, 0.14))      # eyebrows
+        head.sphere(brow, 0.011, (sx * 0.035, -0.099, 0.12), seg=6)            # eyes
     if hat == "boonie":
-        head.cyl(cloth, 0.2, 0.02, (0, 0, 0.17), seg=16)
-        head.cyl(cloth, 0.125, 0.11, (0, 0, 0.23), seg=12, r2=0.11)
-        head.cyl(gear, 0.127, 0.025, (0, 0, 0.19), seg=12)
+        head.cyl(cloth, 0.2, 0.015, (0, 0, 0.18), seg=18, r2=0.19)
+        head.cyl(cloth, 0.118, 0.1, (0, 0, 0.23), seg=14, r2=0.106)
+        head.cyl(gear, 0.12, 0.022, (0, 0, 0.2), seg=14)
         if ghillie:
             ghillie_strips(head, burlap, [(0, 0, 0.26, 0.12), (0, 0.04, 0.2, 0.19)], 46, 0.32, 9)
-    elif faction == "army":
-        helmet = mat("helmet", "#3f4a26", 0.8)
-        head.sphere(helmet, 0.145, (0, 0, 0.15), (1.0, 1.05, 0.75), seg=12)
-        head.cyl(helmet, 0.16, 0.02, (0, 0, 0.1), seg=12)
-        head.box(gear, (0.2, 0.015, 0.02), (0, -0.115, 0.04))
+    elif army:
+        helmet = mat("helmet", "#ffffff", 0.85, image=cloth_tex())             # cloth-covered helmet
+        head.sphere(helmet, 0.142, (0, 0.005, 0.15), (1.0, 1.06, 0.78), seg=14)
+        head.cyl(helmet, 0.152, 0.018, (0, 0.005, 0.1), seg=14)
+        head.cyl(strap, 0.144, 0.022, (0, 0.005, 0.145), seg=14)               # band
+        for sx in (-1, 1):
+            head.box(strap, (0.008, 0.012, 0.11), (sx * 0.09, -0.04, 0.04), (0, 0, sx * 8))  # chin strap
     else:
         cap = mat("cap", "#4b4a2a", 0.95)
-        head.sphere(hair, 0.12, (0, 0.012, 0.135), (0.95, 1.0, 0.9))
-        head.cyl(cap, 0.12, 0.08, (0, 0, 0.2), seg=12)
+        head.sphere(hair, 0.116, (0, 0.012, 0.135), (0.92, 1.0, 0.9), seg=12)
+        head.cyl(cap, 0.118, 0.08, (0, 0, 0.2), seg=14)
         head.box(cap, (0.17, 0.11, 0.015), (0, -0.13, 0.17), (8, 0, 0))
     head.finish(t, (0, 0, 0.6))
 
     # Arms hold the rifle: right hand on the grip, left hand on the handguard
-    arm_r = Part("ArmR")
-    arm_r.box(cloth, (0.11, 0.12, 0.3), (0, 0, -0.14))
-    arm_r.box(cloth, (0.1, 0.3, 0.1), (0, -0.13, -0.3))
-    arm_r.sphere(skin_m, 0.05, (0, -0.29, -0.3), seg=8)
-    arm_r.finish(t, (-0.26, 0, 0.46), (0, 0, -8))
+    def arm(side, fore_len, pos, rot):
+        a = Part("Arm" + side, 3.4)
+        a.cyl(cloth, 0.06, 0.3, (0, 0, -0.14), seg=10, r2=0.05)                  # upper arm
+        a.sphere(cloth, 0.052, (0, 0, -0.3), seg=8)                               # elbow
+        a.cyl(cloth, 0.05, fore_len - 0.08, (0, -(fore_len - 0.08) / 2, -0.3), (90, 0, 0), seg=10, r2=0.042)
+        a.cyl(skin_m, 0.038, 0.06, (0, -(fore_len - 0.05), -0.3), (90, 0, 0), seg=8)  # wrist
+        a.sphere(skin_m, 0.045, (0, -fore_len + 0.01, -0.3 + (0.02 if side == "L" else 0)), (0.8, 1.1, 1.0), seg=8)  # hand
+        a.finish(t, pos, rot)
 
-    arm_l = Part("ArmL")
-    arm_l.box(cloth, (0.11, 0.12, 0.3), (0, 0, -0.14))
-    arm_l.box(cloth, (0.1, 0.42, 0.1), (0, -0.19, -0.29))
-    arm_l.sphere(skin_m, 0.05, (0, -0.42, -0.28), seg=8)
-    arm_l.finish(t, (0.25, 0, 0.46), (0, 0, -32))
+    arm("R", 0.3, (-0.26, 0, 0.46), (0, 0, -8))
+    arm("L", 0.43, (0.25, 0, 0.46), (0, 0, -32))
 
     if weapon == "svd":
         p = Part("Rifle", 4.0)

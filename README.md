@@ -55,6 +55,7 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
   - Nandikadal: smoke columns on the horizon.
   - Every mission has a sky dome with clouds and a sun glow. The sky also gives image-based light and reflections. Fog fades into the horizon, and distant hills sit beyond the play area. Fog is kept far enough out that enemies at normal engagement range stay visible.
 - **Post-processing** (`src/postfx.js`): ACES tone mapping and a colour grade per mission, with saturation, contrast, tint, vignette and grain. High quality adds 4× MSAA and a subtle bloom.
+- **Soldiers:** rounded limbs and torso, a load-bearing vest with magazine pouches, a patrol pack with a rolled poncho, a water bottle, bloused boots, and a face with nose, ears, eyes and eyebrows. Army soldiers wear a cloth-covered helmet with a chin strap. The Special Forces soldier wears a boonie hat and face paint. The camouflage is drawn at a finer DPM scale.
 - **Presentation:**
   - The menu background slowly flies over the real mission map.
   - Missions fade up from black. Letterbox bars and a title card frame the insertion.
