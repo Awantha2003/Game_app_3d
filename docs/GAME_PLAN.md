@@ -135,6 +135,7 @@ Rules:
 | A | Baseline & safety | Build passes, bot playthrough of all 6 missions, git tag `baseline-before-story`, automated campaign test (`npm run test:campaign`) | ✅ |
 | B/C | **M1 — Story campaign** | Prologue cinematic, characters, radio dialogue for every mission, history/fiction briefing and debrief, XP and ranks, promotion celebration, Profile, Historical Archive, Settings, Credits, epilogue timeline | ✅ (this milestone) |
 | D | M2 — Tactical feel | Crouch/prone, stealth detection meter, patrols, suspicious/search AI, alarms with runners and reinforcements, watchtower sentries (climbable), binoculars + marking, tactical map, insertion by helicopter / navy boat / APC, squad orders (follow/hold, Bravo team move, weapons free/tight), marksman with ghillie suit, suppressed pistol, SVD with scope sway and breath, grenades | ✅ |
+| — | Visual upgrade (environment) | Alpha-card foliage with wind, more vegetation types, splat-textured terrain with tracks, mud, sand, puddles and canopy shade, sky dome and image-based light, per-mission atmosphere and weather, distant hills, colour grade, MSAA and bloom, low/medium/high quality, menu flyover, letterbox, title card, outro camera, contact shadows | ✅ first pass |
 | D | M3 — Squad roles | Medic healing, support gunner suppression, flanking AI, cover use | 🔜 |
 | E | M4 — Loadout | Loadout screen, LMG, rank unlocks, night vision for night missions | 🔜 |
 | C | M5 — New missions | Sampur, Vakarai, Anandapuram, Puthumathalan | 🔜 |

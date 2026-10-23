@@ -26,7 +26,11 @@ import random
 import bpy  # noqa: E402  (must be imported before bmesh when used as a module)
 import bmesh
 import numpy as np
-from mathutils import Euler, Matrix, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
+
+
+def Quaternion_axis(axis, angle):
+    return Quaternion(axis.normalized(), angle)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GLB_DIR = os.path.join(ROOT, "public", "models")
@@ -34,6 +38,8 @@ BLEND_DIR = os.path.join(ROOT, "blender", "models")
 UNITY_RES = os.path.join(ROOT, "unity", "WanniFront", "Assets", "WanniFront", "Resources")
 UNITY_MODELS = os.path.join(UNITY_RES, "Models")
 UNITY_TEX = os.path.join(UNITY_RES, "Textures")
+# The Unity project is only re-exported on request: WANNI_UNITY=1
+EXPORT_UNITY = os.environ.get("WANNI_UNITY") == "1"
 UNITY_MATERIALS = {}
 TEX = 256
 
@@ -182,6 +188,7 @@ class Part:
         self.bm = bmesh.new()
         self.mats = []
         self.uv_scale = uv_scale
+        self.custom_uv = {}
 
     def _tag(self, before, m, smooth=False):
         if m not in self.mats:
@@ -236,12 +243,55 @@ class Part:
             self.bm.faces.new([front[i], front[j], back[j], back[i]])
         return self._tag(before, m)
 
+    def quad(self, m, corners, uvs=((0, 0), (1, 0), (1, 1), (0, 1))):
+        """A textured card; corners in counter-clockwise order."""
+        vs = [self.bm.verts.new(Vector(c)) for c in corners]
+        f = self.bm.faces.new(vs)
+        if m not in self.mats:
+            self.mats.append(m)
+        f.material_index = self.mats.index(m)
+        self.custom_uv[f] = list(uvs)
+        return f
+
+    def card(self, m, center, size, rot, uv=(0, 0, 1, 1)):
+        """Flat square card (leaf clusters, fans)."""
+        M = xform(center, rot)
+        hx, hy = size[0] / 2, size[1] / 2
+        c = [M @ Vector(v) for v in ((-hx, 0, -hy), (hx, 0, -hy), (hx, 0, hy), (-hx, 0, hy))]
+        u0, v0, u1, v1 = uv
+        self.quad(m, c, ((u0, v0), (u1, v0), (u1, v1), (u0, v1)))
+
+    def strip(self, m, base, yaw, pitch, length, width, droop=0.0, segs=4, roll=0.0, uv=(0, 0, 1, 1), taper=0.3):
+        """Bent ribbon along a spine (palm fronds, fern fronds, vines).
+        The texture runs along u from base to tip."""
+        y, pch = math.radians(yaw), math.radians(pitch)
+        side = Vector((math.cos(y + math.pi / 2), math.sin(y + math.pi / 2), 0))
+        side = Quaternion_axis(Vector((math.cos(y), math.sin(y), 0)), math.radians(roll)) @ side
+        pts = [Vector(base)]
+        seg = length / segs
+        for i in range(segs):
+            a = pch - math.radians(droop) * (i + 0.5) / segs
+            d = Vector((math.cos(y) * math.cos(a), math.sin(y) * math.cos(a), math.sin(a)))
+            pts.append(pts[-1] + d * seg)
+        u0, v0, u1, v1 = uv
+        for i in range(segs):
+            w0 = width * (1 - taper * i / segs) / 2
+            w1 = width * (1 - taper * (i + 1) / segs) / 2
+            a, b = pts[i], pts[i + 1]
+            ua, ub = u0 + (u1 - u0) * i / segs, u0 + (u1 - u0) * (i + 1) / segs
+            self.quad(m, (a - side * w0, b - side * w1, b + side * w1, a + side * w0),
+                      ((ua, v0), (ub, v0), (ub, v1), (ua, v1)))
+
     def finish(self, parent=None, loc=(0, 0, 0), rot=(0, 0, 0)):
         bm = self.bm
         bm.normal_update()
         uv = bm.loops.layers.uv.new("UVMap")
         s = self.uv_scale
         for f in bm.faces:
+            if f in self.custom_uv:
+                for loop, (u, v) in zip(f.loops, self.custom_uv[f]):
+                    loop[uv].uv = (u, v)
+                continue
             n = f.normal
             ax = max(range(3), key=lambda i: abs(n[i]))
             a, b = [(1, 2), (0, 2), (0, 1)][ax]
@@ -288,6 +338,8 @@ def save(name):
 
 def export_unity(name):
     """FBX + PNG textures + material table for the Unity project."""
+    if not EXPORT_UNITY:
+        return
     os.makedirs(UNITY_MODELS, exist_ok=True)
     os.makedirs(UNITY_TEX, exist_ok=True)
     for img in bpy.data.images:
@@ -665,93 +717,6 @@ def sluice_gate():
     save("sluice_gate")
 
 
-def coconut_palm():
-    reset()
-    bark = mat("palm_bark", "#ffffff", 1.0, image=tex_noise("tex_bark", "#6f5a42", "#55452f", 9, 4, 24, stripes=20))
-    leaf = mat("palm_leaf", "#4f7a28", 0.8)
-    nut = mat("coconut", "#5d6a1e", 0.7)
-    p = Part("Palm", 0.8)
-    x = y = 0.0
-    z = 0.0
-    lean = 0.0
-    for i in range(8):
-        lean += 2.2
-        seg = 1.2
-        r = 0.2 - i * 0.012
-        dx = math.sin(math.radians(lean)) * seg
-        p.cyl(bark, r, seg + 0.05, (x + dx / 2, 0, z + seg / 2), (0, lean, 0), seg=7, r2=r - 0.01)
-        x += dx
-        z += math.cos(math.radians(lean)) * seg
-    top = (x, 0, z)
-    for i in range(10):
-        a = i / 10 * 360
-        droop = 25 + (i % 3) * 12
-        rad = math.radians(a)
-        cx = top[0] + math.cos(rad) * 1.5
-        cy = math.sin(rad) * 1.5
-        p.box(leaf, (0.55, 3.2, 0.03), (cx, cy, top[2] - 0.35), (droop, 0, a - 90))
-    for i in range(5):
-        a = i / 5 * math.tau
-        p.sphere(nut, 0.13, (top[0] + math.cos(a) * 0.22, math.sin(a) * 0.22, top[2] - 0.25), seg=6)
-    p.finish()
-    save("palm_coconut")
-
-
-def palmyrah_palm():
-    """Palmyrah, the signature tree of the Jaffna peninsula and Wanni."""
-    reset()
-    bark = mat("palmyrah_bark", "#ffffff", 1.0, image=tex_noise("tex_bark2", "#6a5a48", "#4a3f33", 19, 4, 24, stripes=24))
-    leaf = mat("palmyrah_leaf", "#6a8a34", 0.85)
-    dry = mat("dry_leaf", "#7a6a3a", 0.95)
-    p = Part("Palmyrah", 0.8)
-    p.cyl(bark, 0.26, 11.0, (0, 0, 5.5), seg=8, r2=0.2)
-    rnd = random.Random(3)
-    for i in range(16):
-        a = rnd.uniform(0, 360)
-        tilt = rnd.uniform(-60, 60)
-        r = math.radians(a)
-        p.cyl(leaf, 1.2, 0.04, (math.cos(r) * 0.9, math.sin(r) * 0.9, 11.5 + rnd.uniform(-0.3, 0.6)),
-              (tilt, rnd.uniform(-40, 40), a), seg=9, smooth=False)
-    for i in range(6):
-        a = rnd.uniform(0, 360)
-        r = math.radians(a)
-        p.cyl(dry, 1.0, 0.04, (math.cos(r) * 0.5, math.sin(r) * 0.5, 10.3), (75, 0, a), seg=8, smooth=False)
-    p.finish()
-    save("palm_palmyrah")
-
-
-def jungle_tree():
-    reset()
-    bark = mat("tree_bark", "#4d3a28", 1.0)
-    leaf = mat("tree_leaf", "#3b5e22", 0.9)
-    leaf2 = mat("tree_leaf2", "#4c6f2a", 0.9)
-    p = Part("Tree", 0.8)
-    p.cyl(bark, 0.35, 5.0, (0, 0, 2.5), seg=7, r2=0.22)
-    p.cyl(bark, 0.12, 2.5, (0.7, 0, 4.4), (0, 35, 0), seg=5)
-    p.cyl(bark, 0.12, 2.5, (-0.6, 0.3, 4.6), (0, -30, 20), seg=5)
-    rnd = random.Random(5)
-    for i in range(7):
-        p.ico(leaf if i % 2 else leaf2, rnd.uniform(1.4, 2.2),
-              (rnd.uniform(-1.6, 1.6), rnd.uniform(-1.6, 1.6), rnd.uniform(5.6, 7.5)),
-              (1, 1, 0.7), sub=1, jitter=0.25, seed=i)
-    p.finish()
-    save("tree_jungle")
-
-
-def bush():
-    reset()
-    leaf = mat("bush_leaf", "#47662a", 0.9)
-    leaf2 = mat("bush_leaf2", "#5b7a30", 0.9)
-    p = Part("Bush", 0.8)
-    rnd = random.Random(8)
-    for i in range(5):
-        p.ico(leaf if i % 2 else leaf2, rnd.uniform(0.5, 0.9),
-              (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), rnd.uniform(0.3, 0.7)),
-              (1, 1, 0.75), sub=1, jitter=0.12, seed=i)
-    p.finish()
-    save("bush")
-
-
 def rock_outcrop():
     """Granite outcrop like Thoppigala ('Baron's Cap')."""
     reset()
@@ -887,6 +852,377 @@ def build_svd(p):
     return (0, -0.9, 0.045), (0, 0.0, 0.135), ((0, 0.06, -0.06), (0, -0.36, -0.005))
 
 
+
+# --------------------------------------------------------------------------
+# Foliage: alpha textures painted with numpy, used on cards and ribbons.
+# Materials named "foliage_*" are alpha-tested and wind-animated in the game.
+# --------------------------------------------------------------------------
+
+PUBLIC_TEX = os.path.join(ROOT, "public", "textures")
+
+
+def make_image_rgba(name, rgba):
+    h, w, _ = rgba.shape
+    img = bpy.data.images.new(name, w, h, alpha=True)
+    img.pixels.foreach_set(np.clip(rgba, 0, 1).astype(np.float32).ravel())
+    img.file_format = "PNG"
+    img.alpha_mode = "STRAIGHT"
+    img.pack()
+    return img
+
+
+def paint_leaf(img, cx, cy, length, width, angle, color, rng, rib=True):
+    """Pointed leaf: draws into an (h, w, 4) array, origin bottom-left."""
+    h, w, _ = img.shape
+    r = int(length * 0.6) + 2
+    x0, x1 = max(0, int(cx - r)), min(w, int(cx + r))
+    y0, y1 = max(0, int(cy - r)), min(h, int(cy + r))
+    if x1 <= x0 or y1 <= y0:
+        return
+    ys, xs = np.mgrid[y0:y1, x0:x1]
+    dx, dy = xs - cx, ys - cy
+    ca, sa = math.cos(angle), math.sin(angle)
+    u = dx * ca + dy * sa
+    v = -dx * sa + dy * ca
+    t = np.clip(u / length + 0.5, 0, 1)
+    half = width / 2 * np.power(np.sin(np.pi * t), 0.75)
+    inside = (np.abs(u) < length / 2) & (np.abs(v) < half)
+    shade = 0.78 + 0.22 * (1 - np.abs(v) / np.maximum(half, 1e-3))
+    if rib:
+        shade = np.where(np.abs(v) < 0.9, shade * 0.8, shade)
+    col = np.array(color) * (0.9 + rng.uniform(-0.08, 0.08))
+    region = img[y0:y1, x0:x1]
+    for k in range(3):
+        region[..., k] = np.where(inside, col[k] * shade, region[..., k])
+    region[..., 3] = np.where(inside, 1.0, region[..., 3])
+
+
+GREENS = [(0.18, 0.32, 0.09), (0.24, 0.40, 0.11), (0.30, 0.44, 0.14), (0.20, 0.36, 0.13), (0.36, 0.46, 0.16)]
+
+
+def tex_leaf_cluster(name, seed, n=150, size=512, palette=GREENS, leaf=(70, 26)):
+    rng = random.Random(seed)
+    img = np.zeros((size, size, 4))
+    for i in range(n):
+        a = rng.uniform(0, math.tau)
+        rr = size * 0.42 * math.sqrt(rng.random())
+        cx, cy = size / 2 + math.cos(a) * rr, size / 2 + math.sin(a) * rr
+        L = rng.uniform(leaf[0] * 0.7, leaf[0] * 1.2)
+        paint_leaf(img, cx, cy, L, L * leaf[1] / leaf[0], rng.uniform(0, math.tau), rng.choice(palette), rng)
+    return make_image_rgba(name, img)
+
+
+def tex_frond(name, seed, w=512, h=128, color=(0.27, 0.42, 0.12), leaflet=(55, 9), dense=60, dry=False):
+    """Palm/fern frond along u: a rachis with leaflets on both sides."""
+    rng = random.Random(seed)
+    img = np.zeros((h, w, 4))
+    img[h // 2 - 2:h // 2 + 2, 6:w - 4] = [color[0] * 0.6, color[1] * 0.6, color[2] * 0.4, 1]
+    for i in range(dense):
+        t = (i + 0.5) / dense
+        x = 8 + t * (w - 16)
+        L = leaflet[0] * (1 - 0.6 * t) * rng.uniform(0.8, 1.1) * (h / 128)
+        for side in (1, -1):
+            ang = side * math.radians(rng.uniform(52, 70))
+            cx = x + math.cos(ang) * L * 0.45
+            cy = h / 2 + math.sin(ang) * L * 0.45
+            c = color if not dry else (0.45, 0.36, 0.18)
+            c = tuple(min(1, ch * rng.uniform(0.85, 1.15)) for ch in c)
+            paint_leaf(img, cx, cy, L, leaflet[1], ang, c, rng, rib=False)
+    return make_image_rgba(name, img)
+
+
+def tex_fan(name, seed, size=256, color=(0.30, 0.44, 0.14)):
+    """Palmyrah fan leaf: radial segments from the base (bottom centre)."""
+    rng = random.Random(seed)
+    img = np.zeros((size, size, 4))
+    for i in range(34):
+        ang = math.radians(15 + 150 * i / 33)
+        L = size * rng.uniform(0.82, 0.98)
+        cx = size / 2 + math.cos(ang) * L * 0.5
+        cy = 6 + math.sin(ang) * L * 0.5
+        paint_leaf(img, cx, cy, L, size * 0.075, ang, tuple(c * rng.uniform(0.85, 1.12) for c in color), rng)
+    return make_image_rgba(name, img)
+
+
+def tex_banana(name, seed, w=256, h=96):
+    """Banana leaf with the typical wind-torn slits."""
+    rng = random.Random(seed)
+    img = np.zeros((h, w, 4))
+    paint_leaf(img, w / 2, h / 2, w * 0.98, h * 0.92, 0, (0.36, 0.52, 0.16), rng)
+    for i in range(14):  # tears
+        x = int(rng.uniform(0.1, 0.9) * w)
+        side = rng.choice([1, -1])
+        y0, y1 = (h // 2 + 4, h) if side > 0 else (0, h // 2 - 4)
+        img[y0:y1, x:x + 2, 3] = 0
+    img[h // 2 - 2:h // 2 + 2, :, :3] *= 0.75
+    return make_image_rgba(name, img)
+
+
+def tex_vines(name, seed, w=128, h=512):
+    rng = random.Random(seed)
+    img = np.zeros((h, w, 4))
+    for i in range(7):
+        x = rng.uniform(8, w - 8)
+        ln = rng.uniform(0.5, 1.0) * h
+        for y in range(h - 1, int(h - ln), -1):
+            xx = int(x + math.sin(y * 0.05 + i) * 3)
+            img[y, max(0, xx - 1):xx + 1] = [0.2, 0.26, 0.12, 1]
+            if rng.random() < 0.08:
+                paint_leaf(img, xx + rng.uniform(-6, 6), y, 16, 7, rng.uniform(0, math.tau), rng.choice(GREENS), rng, rib=False)
+    return make_image_rgba(name, img)
+
+
+def tex_grass_card(name, seed, w=256, h=128, tones=((0.36, 0.48, 0.16), (0.45, 0.52, 0.2), (0.52, 0.5, 0.26), (0.3, 0.42, 0.14))):
+    rng = np.random.default_rng(seed)
+    img = np.zeros((h, w, 4))
+    for i in range(70):
+        x0 = rng.uniform(6, w - 6)
+        top = rng.uniform(0.35, 0.98) * h
+        lean = rng.uniform(-22, 22)
+        width = rng.uniform(1.4, 2.8)
+        col = np.array(tones[i % len(tones)]) * rng.uniform(0.85, 1.1)
+        for y in range(int(top)):
+            t = y / top
+            x = x0 + lean * t * t
+            ww = width * (1 - t) + 0.4
+            xs = np.arange(max(0, int(x - ww)), min(w, int(x + ww) + 1))
+            img[y, xs, :3] = col * (0.55 + 0.45 * t)
+            img[y, xs, 3] = 1.0
+    return make_image_rgba(name, img)
+
+
+def tex_litter(name, seed, size=256):
+    """Fallen leaves and twigs for the forest floor."""
+    rng = random.Random(seed)
+    img = np.zeros((size, size, 4))
+    browns = [(0.42, 0.30, 0.16), (0.52, 0.38, 0.2), (0.33, 0.24, 0.13), (0.55, 0.45, 0.22), (0.3, 0.32, 0.14)]
+    for i in range(70):
+        paint_leaf(img, rng.uniform(10, size - 10), rng.uniform(10, size - 10), rng.uniform(18, 34), rng.uniform(8, 14),
+                   rng.uniform(0, math.tau), rng.choice(browns), rng)
+    for i in range(8):
+        x, y, a, L = rng.uniform(20, size - 20), rng.uniform(20, size - 20), rng.uniform(0, math.tau), rng.uniform(30, 70)
+        for k in range(int(L)):
+            xx, yy = int(x + math.cos(a) * k), int(y + math.sin(a) * k)
+            if 0 <= xx < size and 0 <= yy < size:
+                img[yy, xx] = [0.25, 0.18, 0.1, 1]
+    return make_image_rgba(name, img)
+
+
+def save_public(img):
+    os.makedirs(PUBLIC_TEX, exist_ok=True)
+    img.filepath_raw = os.path.join(PUBLIC_TEX, img.name + ".png")
+    img.file_format = "PNG"
+    img.save()
+
+
+def foliage(name, image, color="#ffffff"):
+    return mat("foliage_" + name, color, 0.75, image=image)
+
+
+def leaf_cluster(p, m, center, radius, rng, cards=7, size=3.2):
+    """A clump of crossed leaf cards around a branch tip."""
+    for i in range(cards):
+        off = Vector((rng.uniform(-1, 1), rng.uniform(-1, 1), rng.uniform(-0.4, 0.5))) * radius
+        p.card(m, Vector(center) + off, (size * rng.uniform(0.8, 1.15), size * rng.uniform(0.8, 1.15)),
+               (rng.uniform(-35, 35) + (90 if i % 3 == 0 else 0), rng.uniform(-30, 30), rng.uniform(0, 180)))
+
+
+def branch(p, m, a, b, r0, r1):
+    a, b = Vector(a), Vector(b)
+    d = b - a
+    rot = d.to_track_quat("Z", "Y").to_euler()
+    p.cyl(m, r0, d.length, tuple((a + b) / 2), tuple(math.degrees(x) for x in rot), seg=7, r2=r1)
+
+
+def jungle_tree():
+    """Tall rainforest tree: buttress roots, spreading branches, leaf clumps and hanging vines."""
+    reset()
+    bark = mat("tree_bark", "#ffffff", 1.0, image=tex_noise("tex_bark3", "#6b5a44", "#3e3326", 15, 4, 18, stripes=None))
+    leaves = foliage("canopy", tex_leaf_cluster("tex_leaves_a", 3))
+    leaves2 = foliage("canopy2", tex_leaf_cluster("tex_leaves_b", 9, palette=GREENS[1:]))
+    vine = foliage("vine", tex_vines("tex_vines", 4))
+    rng = random.Random(21)
+    p = Part("Tree", 0.8)
+    p.cyl(bark, 0.42, 12.0, (0, 0, 6.0), seg=9, r2=0.26)
+    for i in range(5):  # buttress roots flaring out from the trunk
+        a = i / 5 * math.tau + 0.3
+        branch(p, bark, (math.cos(a) * 0.25, math.sin(a) * 0.25, 1.6), (math.cos(a) * 1.3, math.sin(a) * 1.3, -0.1), 0.16, 0.05)
+    tips = []
+    for i in range(5):
+        a = i / 5 * math.tau + rng.uniform(-0.3, 0.3)
+        z0 = rng.uniform(8.5, 11.5)
+        L = rng.uniform(3.5, 5.5)
+        tip = (math.cos(a) * L, math.sin(a) * L, z0 + rng.uniform(1.5, 3))
+        branch(p, bark, (0, 0, z0), tip, 0.18, 0.08)
+        tips.append(tip)
+    tips.append((0, 0, 13.2))
+    for i, t in enumerate(tips):
+        leaf_cluster(p, leaves if i % 2 else leaves2, t, 1.6, rng, cards=8, size=3.6)
+    for i in range(6):
+        t = tips[i % len(tips)]
+        a = rng.uniform(0, math.tau)
+        top = Vector(t) + Vector((math.cos(a), math.sin(a), -0.5)) * 0.8
+        L = rng.uniform(3, 6)
+        p.card(vine, top - Vector((0, 0, L / 2)), (0.8, L), (0, 0, math.degrees(a)))
+    p.finish()
+    save("tree_jungle")
+
+
+def tree_rain2():
+    """Smaller, broad tree with a dense rounded crown."""
+    reset()
+    bark = mat("tree_bark", "#ffffff", 1.0, image=tex_noise("tex_bark4", "#5c4c3a", "#3a3024", 25, 4, 16))
+    leaves = foliage("canopy3", tex_leaf_cluster("tex_leaves_c", 13, n=170, leaf=(60, 30)))
+    rng = random.Random(33)
+    p = Part("Tree2", 0.8)
+    p.cyl(bark, 0.3, 4.5, (0, 0, 2.25), seg=8, r2=0.2)
+    for i in range(4):
+        a = i / 4 * math.tau + 0.4
+        tip = (math.cos(a) * 2.2, math.sin(a) * 2.2, 5.6)
+        branch(p, bark, (0, 0, 4), tip, 0.13, 0.06)
+        leaf_cluster(p, leaves, tip, 1.5, rng, cards=7, size=3.0)
+    leaf_cluster(p, leaves, (0, 0, 6.3), 1.6, rng, cards=9, size=3.2)
+    p.finish()
+    save("tree_rain2")
+
+
+def coconut_palm():
+    reset()
+    bark = mat("palm_bark", "#ffffff", 1.0, image=tex_noise("tex_bark", "#6f5a42", "#55452f", 9, 4, 24, stripes=20))
+    frond = foliage("frond", tex_frond("tex_frond", 5))
+    dry = foliage("frond_dry", tex_frond("tex_frond_dry", 6, dry=True))
+    nut = mat("coconut", "#5d6a1e", 0.7)
+    p = Part("Palm", 0.8)
+    x = z = 0.0
+    lean = 0.0
+    for i in range(8):
+        lean += 2.2
+        seg = 1.2
+        r = 0.2 - i * 0.012
+        dx = math.sin(math.radians(lean)) * seg
+        p.cyl(bark, r, seg + 0.05, (x + dx / 2, 0, z + seg / 2), (0, lean, 0), seg=7, r2=r - 0.01)
+        x += dx
+        z += math.cos(math.radians(lean)) * seg
+    top = Vector((x, 0, z))
+    rng = random.Random(7)
+    for i in range(16):
+        yaw = i / 16 * 360 + rng.uniform(-10, 10)
+        up = i % 4 == 0
+        p.strip(frond, top, yaw, 50 if up else rng.uniform(15, 30), rng.uniform(3.6, 4.6), 1.1,
+                droop=40 if up else rng.uniform(70, 100), segs=4, roll=rng.uniform(-15, 15))
+    for i in range(4):
+        p.strip(dry, top - Vector((0, 0, 0.3)), rng.uniform(0, 360), -30, 3.0, 0.9, droop=40, segs=3)
+    for i in range(6):
+        a = i / 6 * math.tau
+        p.sphere(nut, 0.13, (top.x + math.cos(a) * 0.22, math.sin(a) * 0.22, top.z - 0.25), seg=6)
+    p.finish()
+    save("palm_coconut")
+
+
+def palmyrah_palm():
+    """Palmyrah: straight dark trunk, crown of fan leaves, a skirt of dry leaves."""
+    reset()
+    bark = mat("palmyrah_bark", "#ffffff", 1.0, image=tex_noise("tex_bark2", "#6a5a48", "#4a3f33", 19, 4, 24, stripes=24))
+    fan = foliage("fan", tex_fan("tex_fan", 3))
+    stem = mat("petiole", "#5a6a2c", 0.9)
+    p = Part("Palmyrah", 0.8)
+    p.cyl(bark, 0.27, 11.0, (0, 0, 5.5), seg=8, r2=0.21)
+    rng = random.Random(3)
+    for i in range(22):
+        yaw = i / 22 * 360 + rng.uniform(-8, 8)
+        el = rng.uniform(-25, 65)
+        r = math.radians(yaw)
+        d = Vector((math.cos(r) * math.cos(math.radians(el)), math.sin(r) * math.cos(math.radians(el)), math.sin(math.radians(el))))
+        base = Vector((0, 0, 11.1)) + d * 1.0
+        branch(p, stem, (0, 0, 11.0), tuple(base), 0.04, 0.03)
+        p.card(fan, base + d * 1.1, (2.4, 2.4), (90 - el + rng.uniform(-20, 20), 0, yaw - 90))
+    dry_frond = foliage("frond_dry", tex_frond("tex_frond_dry2", 8, dry=True))
+    for i in range(9):  # dead leaves hanging down the trunk
+        p.strip(dry_frond, (0, 0, 10.9), i / 9 * 360 + rng.uniform(-15, 15), -60, 2.0, 0.7, droop=20, segs=2)
+    p.finish()
+    save("palm_palmyrah")
+
+
+def bush():
+    reset()
+    leaves = foliage("shrub", tex_leaf_cluster("tex_leaves_d", 17, n=120, leaf=(50, 22)))
+    p = Part("Bush", 0.8)
+    rng = random.Random(8)
+    for i in range(12):
+        a = i / 12 * 360
+        p.card(leaves, (rng.uniform(-0.4, 0.4), rng.uniform(-0.4, 0.4), rng.uniform(0.5, 0.8)),
+               (rng.uniform(1.3, 1.8), rng.uniform(1.0, 1.4)), (rng.uniform(-20, 20), rng.uniform(-15, 15), a))
+    p.finish()
+    save("bush")
+
+
+def fern():
+    reset()
+    fr = foliage("fern", tex_frond("tex_fern", 31, w=256, h=96, color=(0.25, 0.45, 0.13), leaflet=(34, 9), dense=34))
+    p = Part("Fern", 1.0)
+    rng = random.Random(4)
+    for i in range(11):
+        p.strip(fr, (0, 0, 0.05), i / 11 * 360 + rng.uniform(-12, 12), rng.uniform(45, 70), rng.uniform(1.1, 1.6), 0.45,
+                droop=rng.uniform(80, 110), segs=3)
+    p.finish()
+    save("fern")
+
+
+def banana():
+    reset()
+    stem = mat("banana_stem", "#6d7a3a", 0.85)
+    leaf = foliage("banana", tex_banana("tex_banana", 2))
+    p = Part("Banana", 1.0)
+    p.cyl(stem, 0.14, 2.4, (0, 0, 1.2), seg=8, r2=0.1)
+    rng = random.Random(6)
+    for i in range(7):
+        p.strip(leaf, (0, 0, 2.3), i / 7 * 360 + rng.uniform(-15, 15), rng.uniform(35, 70), rng.uniform(1.9, 2.5), 0.75,
+                droop=rng.uniform(60, 110), segs=4, taper=0.2)
+    p.finish()
+    save("banana")
+
+
+def fallen_log():
+    reset()
+    bark = mat("log_bark", "#ffffff", 1.0, image=tex_noise("tex_bark5", "#4e4032", "#2e2620", 41, 4, 16))
+    moss = mat("moss", "#3e5a22", 1.0)
+    p = Part("Log", 0.8)
+    p.cyl(bark, 0.32, 5.5, (0, 0, 0.25), (90, 0, 8), seg=9, r2=0.26)
+    p.cyl(bark, 0.09, 1.6, (0.6, 1.0, 0.45), (60, 0, -40), seg=5)
+    p.cyl(moss, 0.3, 1.8, (0, -1.2, 0.3), (90, 0, 8), seg=9, r2=0.29)
+    p.finish()
+    save("fallen_log")
+
+
+def hut():
+    """Village hut: mud-plastered walls and a cadjan (palm-thatch) roof."""
+    reset()
+    mud = mat("mud_wall", "#ffffff", 0.95, image=tex_noise("tex_mudwall", "#9a7a56", "#7a5c3e", 51, 8, 8))
+    thatch = mat("cadjan", "#ffffff", 1.0, image=tex_noise("tex_cadjan", "#8c7444", "#6a5530", 52, 3, 40, stripes=30))
+    wood = mat("hut_wood", "#4e3a24", 0.9)
+    dark = mat("hut_door", "#1a1510", 1.0)
+    p = Part("Hut", 0.6)
+    p.box(mud, (4.4, 3.4, 2.2), (0, 0, 1.1))
+    p.box(dark, (0.9, 0.05, 1.7), (0.6, -1.72, 0.85))
+    p.box(dark, (0.7, 0.05, 0.6), (-1.3, -1.72, 1.4))
+    p.prism(thatch, 5.6, 4.6, 0.2, 1.7, (0, 0, 2.2), (0, 0, 90))
+    for x in (-2.6, 2.6):
+        p.prism(thatch, 0.2, 4.6, 0.2, 1.7, (x, 0, 2.2), (0, 0, 90))
+    for x in (-2.1, 2.1):
+        p.cyl(wood, 0.07, 2.2, (x, -2.2, 1.1), seg=6)
+    p.box(thatch, (5.0, 1.2, 0.08), (0, -2.4, 2.25), (-14, 0, 0))
+    p.finish()
+    save("hut")
+
+
+def foliage_textures():
+    """Textures used directly by the game (grass cards, forest litter, ground)."""
+    reset()
+    for img in (tex_grass_card("grass_card", 3), tex_grass_card("grass_card_dry", 5, tones=((0.55, 0.5, 0.26), (0.62, 0.55, 0.3), (0.48, 0.46, 0.22))),
+                tex_litter("leaf_litter", 9), tex_frond("fern_card", 11, w=256, h=96, color=(0.25, 0.45, 0.13), leaflet=(34, 9), dense=34)):
+        save_public(img)
+
+
 def weapon_model(name, build):
     """Weapon on its own (third-person), origin at the grip, with a Muzzle empty."""
     reset()
@@ -1015,8 +1351,7 @@ def alarm():
 
 
 def terrain_textures():
-    """Ground textures (albedo + normal map) for the Unity terrain."""
-    os.makedirs(UNITY_TEX, exist_ok=True)
+    """Ground textures (albedo + normal map) for the web terrain shader and the Unity terrain."""
     N = 512
     specs = {
         "ground_grass": ("#4f6b2a", "#6f8a35", "#3a5220", 21),
@@ -1035,11 +1370,15 @@ def terrain_textures():
         rgb = a * (1 - big[..., None]) + b * big[..., None]
         rgb = rgb * (1 - (fine[..., None] < 0.38) * 0.5) + c * ((fine[..., None] < 0.38) * 0.5)
         rgb *= (0.85 + streak[..., None] * 0.3)
-        save_png(name, np.clip(rgb, 0, 1))
+        if EXPORT_UNITY:
+            save_png(name, np.clip(rgb, 0, 1))
+        save_png(name, np.clip(rgb, 0, 1), PUBLIC_TEX)
         gy, gx = np.gradient(h * 6.0)
         nrm = np.stack([-gx, -gy, np.ones_like(h)], axis=2)
         nrm /= np.linalg.norm(nrm, axis=2, keepdims=True)
-        save_png(name + "_n", nrm * 0.5 + 0.5)
+        if EXPORT_UNITY:
+            save_png(name + "_n", nrm * 0.5 + 0.5)
+        save_png(name + "_n", nrm * 0.5 + 0.5, PUBLIC_TEX)
     # grass blade billboard with alpha for terrain detail
     rng = np.random.default_rng(5)
     W, Hh = 128, 128
@@ -1057,16 +1396,18 @@ def terrain_textures():
             xs = np.arange(max(0, int(x - w)), min(W, int(x + w) + 1))
             rgba[y, xs, :3] = col * (0.6 + 0.4 * t)
             rgba[y, xs, 3] = 1.0
-    save_png("grass_blade", rgba, alpha=True)
+    if EXPORT_UNITY:
+        save_png("grass_blade", rgba, alpha=True)
 
 
-def save_png(name, arr, alpha=False):
+def save_png(name, arr, folder=None, alpha=False):
     h, w = arr.shape[:2]
     img = bpy.data.images.new(name, w, h, alpha=alpha)
     if not alpha:
         arr = np.concatenate([arr, np.ones((h, w, 1))], axis=2)
     img.pixels.foreach_set(arr.astype(np.float32).ravel())
-    img.filepath_raw = os.path.join(UNITY_TEX, name + ".png")
+    os.makedirs(folder or UNITY_TEX, exist_ok=True)
+    img.filepath_raw = os.path.join(folder or UNITY_TEX, name + ".png")
     img.file_format = "PNG"
     img.save()
 
@@ -1086,7 +1427,7 @@ BUILDERS = [
     lambda: fp_weapon("fp_t56", build_t56),
     lambda: fp_weapon("fp_pistol", build_pistol),
     lambda: fp_weapon("fp_svd", build_svd),
-    grenade, watchtower, alarm,
+    grenade, watchtower, alarm, tree_rain2, fern, banana, fallen_log, hut, foliage_textures,
 ]
 
 
@@ -1096,5 +1437,6 @@ if __name__ == "__main__":
         build()
     reset()
     terrain_textures()
-    with open(os.path.join(UNITY_RES, "materials.json"), "w") as f:
-        json.dump(UNITY_MATERIALS, f, indent=1)
+    if EXPORT_UNITY:
+        with open(os.path.join(UNITY_RES, "materials.json"), "w") as f:
+            json.dump(UNITY_MATERIALS, f, indent=1)

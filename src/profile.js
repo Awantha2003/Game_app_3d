@@ -41,7 +41,7 @@ function validate(raw, missionIds) {
     sensitivity: clampNum(s.sensitivity, 0.3, 3, DEFAULT_SETTINGS.sensitivity),
     volume: clampNum(s.volume, 0, 1, DEFAULT_SETTINGS.volume),
     difficulty: [0.6, 1, 1.45].includes(s.difficulty) ? s.difficulty : DEFAULT_SETTINGS.difficulty,
-    quality: s.quality === 'low' ? 'low' : 'high',
+    quality: ['low', 'medium', 'high'].includes(s.quality) ? s.quality : 'high',
   };
   return p;
 }

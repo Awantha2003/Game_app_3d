@@ -7,6 +7,8 @@ import { Input } from './input.js';
 import { MISSIONS } from './missions.js';
 import { Prologue } from './cinematic.js';
 import { Insertion } from './insertion.js';
+import { PostFX } from './postfx.js';
+import { Weather } from './weather.js';
 import { Profile } from './profile.js';
 import { Radio } from './radio.js';
 import {
@@ -32,9 +34,10 @@ class Game {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 1.0;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 600);
+    this.camera = new THREE.PerspectiveCamera(70, 1, 0.1, 1100);
+    this.postfx = new PostFX(this.renderer, this.scene, this.camera);
     this.audio = new Audio();
     this.fx = new FX(this.scene);
     this.input = new Input(this.canvas, $('#touch'));
@@ -60,11 +63,39 @@ class Game {
 
   // ------------------------------------------------------------ settings
 
+  // low: no shadows or post effects, fewer grass cards; medium: 1024 shadows,
+  // grade only; high: 2048 shadows, 4x MSAA, bloom and the densest foliage
   applyQuality() {
-    const low = this.profile.settings.quality === 'low';
-    this.renderer.setPixelRatio(low ? 1 : Math.min(window.devicePixelRatio, 2));
-    if (this.world) this.world.sun.castShadow = !low;
+    const q = this.profile.settings.quality;
+    const dpr = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(q === 'low' ? 1 : Math.min(dpr, q === 'medium' ? 1.5 : 2));
+    if (this.world) {
+      this.world.sun.castShadow = q !== 'low';
+      this.renderer.toneMappingExposure = this.world.atm.exposure;
+      this.postfx.setGrade(this.world.atm.grade);
+    }
     this.resize();
+    this.postfx.setup(q);
+  }
+
+  // cinematic framing: letterbox bars, a fade up from black and a title card
+  cinema(on, title = null) {
+    $('#letterbox').classList.toggle('on', on);
+    if (title) {
+      const tc = $('#titlecard');
+      tc.querySelector('.tc-name').textContent = title[0];
+      tc.querySelector('.tc-sub').textContent = title[1];
+      tc.classList.remove('on');
+      void tc.offsetWidth;
+      tc.classList.add('on');
+    }
+  }
+
+  fadeIn() {
+    const f = $('#fade');
+    f.classList.remove('up');
+    void f.offsetWidth;
+    f.classList.add('up');
   }
 
   // ------------------------------------------------------------ UI
@@ -74,6 +105,7 @@ class Game {
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+    this.postfx?.resize();
   }
 
   show(name) {
@@ -299,8 +331,10 @@ class Game {
     this.show(null);
     this.input.requestLock();
     this.input.resetLook();
-    this.toast(`${this.mission.name.toUpperCase()} — ${this.mission.date}`, true);
+    this.fadeIn();
+    this.cinema(!!this.mission.insertion, [this.mission.name, `${this.mission.place} · ${this.mission.date}`]);
     this.audio.stinger(true);
+    this.audio.rain(this.world.atm.weather.rain > 0);
     this.radio.clear();
     if (this.mission.insertion) {
       this.insertion = new Insertion(this, this.mission.insertion);
@@ -311,6 +345,7 @@ class Game {
 
   // gameplay proper begins once the squad is on the ground
   startOperations() {
+    this.cinema(false);
     $('.insert-skip').classList.remove('on');
     $('#hud').classList.remove('cinema');
     this.radio.say(STORY[this.mission.id].intro);
@@ -378,7 +413,9 @@ class Game {
     this.missionIndex = i;
     this.mission = MISSIONS[i];
     this.clearMission();
-    this.world = new World(this.scene, this.mission, 1000 + i * 77);
+    this.world = new World(this.scene, this.mission, 1000 + i * 77, { renderer: this.renderer, quality: this.profile.settings.quality });
+    this.weather = new Weather(this, this.world);
+    this.outro = null;
     const m = this.mission;
     this.player = new Unit(this, 'army', m.player.x, m.player.z, { player: true, yaw: Math.PI, model: 'soldier_sf' });
     this.units = [this.player];
@@ -453,6 +490,11 @@ class Game {
     for (const u of this.units) u.remove();
     this.units = [];
     this.fx.clear();
+    this.weather?.dispose();
+    this.weather = null;
+    this.audio.rain(false);
+    this.cinema(false);
+    $('#hud').classList.remove('cinema');
     if (this.world) this.world.dispose();
     this.world = null;
   }
@@ -555,7 +597,16 @@ class Game {
   missionComplete() {
     this.radio.say(STORY[this.mission.id].outro);
     this.endTimer = Math.min(10, Math.max(2.5, this.radio.remaining + 0.6));
+    // outro shot: the camera pulls away from the section while the radio plays
+    this.outro = { t: 0, a: this.yaw + Math.PI * 0.75 };
+    this.cinema(true);
+    $('#hud').classList.add('cinema');
+    this.toggleMap(false);
     this.endAction = () => {
+      this.outro = null;
+      this.cinema(false);
+      $('#hud').classList.remove('cinema');
+      this.audio.rain(false);
       const m = this.mission;
       const acc = this.shots ? Math.round((this.hits / this.shots) * 100) : 0;
       const rec = this.profile.recordMission(this.missionIndex, {
@@ -649,6 +700,7 @@ class Game {
     this.endTimer = 2;
     this.endAction = () => {
       this.audio.siren(false);
+      this.audio.rain(false);
       this.state = 'failed';
       if (document.pointerLockElement) document.exitPointerLock();
       $('.f-title').textContent = reason;
@@ -1438,7 +1490,38 @@ class Game {
   frame() {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.update(dt);
-    if (this.world) this.renderer.render(this.scene, this.camera);
+    if (!this.world) return;
+    this.world.update(dt, this.camera, this.time);
+    this.weather?.update(dt, this.camera);
+    this.postfx.render(dt);
+  }
+
+  // slow camera move over the real mission ground behind the menus
+  menuCamera(dt) {
+    const w = this.world, p = this.mission.player, t = this.time * 0.035;
+    const R = Math.min(70, w.size * 0.55);
+    const x = p.x * 0.4 + Math.sin(t) * R, z = p.z * 0.4 + Math.sin(t * 0.63 + 1) * R;
+    const ahead = t + 0.25;
+    const lx = p.x * 0.4 + Math.sin(ahead) * R, lz = p.z * 0.4 + Math.sin(ahead * 0.63 + 1) * R;
+    let ground = 0;
+    for (let k = -1; k <= 1; k++) ground = Math.max(ground, w.height(x + k * 6, z + k * 6));
+    const y = Math.max(ground, w.water ?? -99) + 15 + Math.sin(t * 1.7) * 3;
+    this.camera.position.set(x, y, z);
+    this.camera.lookAt(lx, Math.max(w.height(lx, lz), w.water ?? -99) + 6, lz);
+    if (this.camera.fov !== 55) { this.camera.fov = 55; this.camera.updateProjectionMatrix(); }
+  }
+
+  outroCamera(dt) {
+    const o = this.outro, p = this.player.pos;
+    o.t += dt;
+    o.a += dt * 0.12;
+    const r = 5 + o.t * 1.4, h = 1.8 + o.t * 0.6;
+    const head = new THREE.Vector3(p.x, p.y + 1.5, p.z);
+    let cam = new THREE.Vector3(p.x + Math.sin(o.a) * r, p.y + h, p.z + Math.cos(o.a) * r);
+    if (!this.world.lineOfSight(head, cam)) cam = new THREE.Vector3(p.x, p.y + 6 + o.t, p.z + 0.5);
+    this.camera.position.lerp(cam, Math.min(1, dt * 3));
+    this.camera.lookAt(head);
+    if (this.camera.fov !== 55) { this.camera.fov = 55; this.camera.updateProjectionMatrix(); }
   }
 
   update(dt) {
@@ -1458,9 +1541,9 @@ class Game {
         this.input.endFrame();
         return;
       }
-      if (this.input.hit('Escape') || this.input.hit('KeyP')) this.pause();
-      if (this.input.hit('KeyM')) this.toggleMap();
-      this.updatePlayer(dt);
+      if (!this.outro && (this.input.hit('Escape') || this.input.hit('KeyP'))) this.pause();
+      if (!this.outro && this.input.hit('KeyM')) this.toggleMap();
+      if (this.outro) { this.player.sync(dt); this.input.consumeLook(); } else this.updatePlayer(dt);
       this.updateProjectiles(dt);
       for (const u of this.units) if (!u.isPlayer) u.update(dt);
       this.alertLevel = Math.max(0, this.alertLevel - dt);
@@ -1474,7 +1557,11 @@ class Game {
         this.endTimer -= dt;
         if (this.endTimer <= 0) this.endAction();
       }
-      this.updateCamera(dt);
+      if (this.outro) this.outroCamera(dt);
+      else {
+        if (this.camera.fov === 55) { this.camera.fov = 70; this.camera.updateProjectionMatrix(); }
+        this.updateCamera(dt);
+      }
       this.updateHUD();
       if (this.mapOpen) this.drawMap();
       this.fx.update(dt);
@@ -1489,12 +1576,8 @@ class Game {
       for (const u of this.units) u.sync(0);
       this.fx.update(dt);
     } else if (this.world && this.player && this.state !== 'pause') {
-      // slow orbit behind menus
       this.time += dt;
-      const p = this.player.pos;
-      const a = this.time * 0.05;
-      this.camera.position.set(p.x + Math.sin(a) * 22, p.y + 9, p.z + Math.cos(a) * 22);
-      this.camera.lookAt(p.x, p.y + 2, p.z);
+      this.menuCamera(dt);
       for (const u of this.units) u.sync(0);
       this.fx.update(dt);
     }

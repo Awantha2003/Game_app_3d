@@ -10,6 +10,9 @@
 </head>
 <body>
   <canvas id="game"></canvas>
+  <div id="letterbox"><i></i><i></i></div>
+  <div id="titlecard"><div class="tc-name"></div><div class="tc-sub"></div></div>
+  <div id="fade"></div>
 
   <!-- HUD -->
   <div id="hud" class="hidden">
@@ -163,8 +166,9 @@
         </label>
         <label>Graphics
           <select id="set-quality">
-            <option value="high">High (shadows, sharp)</option>
-            <option value="low">Low (faster)</option>
+            <option value="high">High — 2048 shadows, MSAA, bloom, dense grass</option>
+            <option value="medium">Medium — softer shadows, colour grade</option>
+            <option value="low">Low — no shadows or post effects (fastest)</option>
           </select>
         </label>
       </div>

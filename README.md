@@ -42,6 +42,29 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **Squad orders:** T makes the squad follow or hold. V sends Bravo team to the point you are aiming at, so the team can split and flank. X sets weapons free or tight. While weapons are tight, allies fire only once the enemy is alerted. They copy your stance so they don't give you away. Kasun is a marksman in a ghillie suit.
 - **Insertion scenes:** the squad arrives by Bell 212-style helicopter (Thoppigala, Elephant Pass), by Navy Arrow boat onto the Pooneryn beach, or by Buffel APC. You can skip them with Space.
 
+## Environment and presentation
+
+- **Vegetation:** rainforest trees with buttress roots and hanging vines, a second broad-crowned tree, coconut and palmyrah palms, ferns, banana plants, fallen logs, cadjan-roofed village huts and bushes. Leaves are alpha-tested cards painted in Blender, and they sway in the wind.
+- **Ground:** the terrain blends grass, dry grass, dirt, mud and sand textures with normal maps. Tiling is broken up with two rotated scales. Dirt tracks lead from the start through each objective. Camps sit in cleared ground. Shores have sand. Canopies shade the ground beneath them. Grass is made of instanced cards in tiles, and distant tiles are culled. Leaf litter covers the forest floor.
+- **Atmosphere per mission** (`src/atmosphere.js`):
+  - Mavil Aru: humid morning.
+  - Thoppigala: dawn ground mist.
+  - Pooneryn: dusk over the sea.
+  - Kilinochchi: monsoon rain with puddles, wet ground and lightning.
+  - Elephant Pass: midday haze and dust.
+  - Nandikadal: smoke columns on the horizon.
+  - Every mission has a sky dome with clouds and a sun glow. The sky also gives image-based light and reflections. Fog fades into the horizon, and distant hills sit beyond the play area. Fog is kept far enough out that enemies at normal engagement range stay visible.
+- **Post-processing** (`src/postfx.js`): ACES tone mapping and a colour grade per mission, with saturation, contrast, tint, vignette and grain. High quality adds 4× MSAA and a subtle bloom.
+- **Presentation:**
+  - The menu background slowly flies over the real mission map.
+  - Missions fade up from black. Letterbox bars and a title card frame the insertion.
+  - On success, an outro camera pulls away from the section before the debrief.
+  - Soft contact shadows ground every soldier.
+- **Graphics quality** (Settings):
+  - Low: no shadows or post effects, and sparse grass.
+  - Medium: 1024 shadows and the colour grade.
+  - High: 2048 shadows, MSAA, bloom and dense grass.
+
 The full design and roadmap (new missions, squad orders, weapons, co-op with invite links) are in [`docs/GAME_PLAN.md`](docs/GAME_PLAN.md).
 
 ## Testing
@@ -51,6 +74,8 @@ npx playwright install chromium   # once
 npm run test:campaign             # a bot plays all six missions in headless Chromium
 npm run test:campaign -- 0 3      # only missions 1 and 4
 ```
+
+`node tests/shots.mjs <dir> [low|medium|high] [mission indices]` saves a gameplay screenshot of each mission and prints draw calls and triangles (run `npm run build` first).
 
 The test checks the start screen, prologue skip, every menu screen, each mission's completion, debrief XP, the promotions, the epilogue, saving across a reload, and that there are no page errors.
 
@@ -89,8 +114,9 @@ npm run build      # production build in dist/ (static, any web host / GitHub Pa
 
 - `blender/models/*.blend`, the editable Blender files. Open them in Blender to change a model.
 - `public/models/*.glb`, the files the game loads.
+- `public/textures/*.png`, the ground textures and normal maps, grass cards and leaf litter used by the terrain shader.
 
-The models are: SL Army soldier, LTTE cadre, civilian, Unibuffel-style APC, Sea Tiger attack boat, sandbag bunker, sandbag wall, earth bund, house, ruined house, Kilinochchi water tower (toppled), Mavil Aru anicut, coconut palm, palmyrah palm, jungle tree, bush, rocks (including Thoppigala's Baron's Cap) and a supply cache.
+The models are: SL Army soldier, LTTE cadre, civilian, Unibuffel-style APC, Sea Tiger attack boat, sandbag bunker, sandbag wall, earth bund, house, ruined house, Kilinochchi water tower (toppled), Mavil Aru anicut, coconut palm, palmyrah palm, two rainforest trees, bush, fern, banana plant, fallen log, cadjan hut, rocks (including Thoppigala's Baron's Cap) and a supply cache.
 
 To rebuild all models:
 
@@ -99,6 +125,8 @@ blender -b -P blender/build_assets.py      # with Blender 4.x/5.x installed
 # or, without the Blender app:
 pip install bpy && python blender/build_assets.py
 ```
+
+The script only re-exports the FBX models and textures into the Unity project when `WANNI_UNITY=1` is set.
 
 Soldiers face −Y in Blender and are made of parts named `Torso`, `Head`, `ArmL`, `ArmR`, `LegL`, `LegR` and `Muzzle`. The game animates these parts directly, so if you edit a soldier in Blender, keep those names.
 
@@ -110,7 +138,10 @@ blender/models/           editable .blend files
 public/models/            exported .glb models
 src/main.js               game loop, player, camera, objectives, HUD
 src/missions.js           the six missions: history text, maps, objectives
-src/world.js              terrain, water, props, collision and ray casts
+src/world.js              terrain shader, sky, water, props, grass, collision and ray casts
+src/atmosphere.js         per-mission lighting, fog, weather and colour grade
+src/weather.js            rain, mist, dust, smoke and lightning
+src/postfx.js             MSAA, bloom, tone mapping and colour grade
 src/units.js              soldiers and civilians: animation and AI
 src/fx.js, src/audio.js   effects and procedural sound
 src/input.js              keyboard, mouse and touch controls
