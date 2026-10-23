@@ -24,7 +24,12 @@ const COLLIDERS = {
   water_tower: [{ t: 'c', x: 0, z: 0, r: 1.4, h: 7.5 }, { t: 'b', x: 0, z: 9.8, hw: 1.3, hd: 7, h: 2.5 }, { t: 'c', x: 0.6, z: 18.5, r: 4, h: 7 }],
   sluice_gate: [{ t: 'b', x: 0, z: 0, hw: 8.75, hd: 2, h: 4.2 }],
   supplies: [{ t: 'b', x: 0.4, z: 0, hw: 1.0, hd: 0.7, h: 1 }],
+  // only the legs block: the sentry on the platform must stay shootable
+  watchtower: [1, -1].flatMap((a) => [1, -1].map((b) => ({ t: 'c', x: a * 1.2, z: b * 1.2, r: 0.16, h: 4.9 }))),
+  alarm: [{ t: 'c', x: 0, z: 0, r: 0.25, h: 3.2 }],
 };
+
+export const TOWER_HEIGHT = 5.12;
 
 const tmpM = new THREE.Matrix4();
 const tmpQ = new THREE.Quaternion();
@@ -47,6 +52,8 @@ export class World {
     this.spawns = [];
     this.targets = [];
     this.supplies = [];
+    this.alarms = [];
+    this.towers = [];
     this.units = [];
 
     this.buildEnvironment();
@@ -156,7 +163,9 @@ export class World {
       rng: () => w.rng(),
       prop: (type, x, z, rot = 0, scale = 1) => w.addProp(type, x, z, rot, scale),
       scatter: (type, n, area, opts) => w.scatter(type, n, area, opts),
-      enemies: (n, x, z, spread, tag) => w.addSpawns('ltte', n, x, z, spread, tag),
+      enemies: (n, x, z, spread, tag, opts) => w.addSpawns('ltte', n, x, z, spread, tag, opts),
+      tower: (x, z, rot, tag) => w.addTower(x, z, rot, tag),
+      alarm: (x, z, rot, tag) => w.addAlarm(x, z, rot, tag),
       friendlies: (n, x, z, spread) => w.addSpawns('army', n, x, z, spread, 'linkup'),
       civilians: (n, x, z, spread) => w.addSpawns('civ', n, x, z, spread, 'civ'),
       target: (tag, x, z, opts = {}) => w.addTarget(tag, x, z, opts),
@@ -204,7 +213,27 @@ export class World {
     }
   }
 
-  addSpawns(team, n, x, z, spread, tag) {
+  addTower(x, z, rot, tag) {
+    this.addProp('watchtower', x, z, rot);
+    const y = this.height(x, z);
+    this.towers.push({ x, y, z, tag });
+    this.spawns.push({ team: 'ltte', x, z, tag, sentry: true });
+  }
+
+  addAlarm(x, z, rot, tag) {
+    this.addProp('alarm', x, z, rot);
+    this.alarms.push({ x, y: this.height(x, z), z, tag, disabled: false, triggered: false, runner: null });
+  }
+
+  // is a point hidden in vegetation? (bushes give concealment, not cover)
+  inBush(x, z) {
+    for (const b of this.placements.bush || []) {
+      if (Math.abs(b.x - x) < 1.6 && Math.abs(b.z - z) < 1.6 && Math.hypot(b.x - x, b.z - z) < 1.3 * b.scale + 0.4) return true;
+    }
+    return false;
+  }
+
+  addSpawns(team, n, x, z, spread, tag, opts = {}) {
     for (let i = 0; i < n; i++) {
       let px = x, pz = z;
       for (let k = 0; k < 40; k++) {
@@ -212,7 +241,8 @@ export class World {
         pz = z + (this.rng() - 0.5) * spread * 2;
         if (!this.isWater(px, pz, 0.2) && !this.blocked(px, pz, 0.8)) break;
       }
-      this.spawns.push({ team, x: px, z: pz, tag });
+      // about half of each cadre group patrols, the rest guard their posts
+      this.spawns.push({ team, x: px, z: pz, tag, patrol: team === 'ltte' && opts.patrol !== false && i % 2 === 0 });
     }
   }
 

@@ -7,15 +7,15 @@
 
 export const CHARACTERS = {
   awan: { name: 'Awan', role: 'Section commander (you)', color: '#e0b84a' },
-  ruwan: { name: 'Sgt. Ruwan Jayasekara', short: 'Sgt. Ruwan', role: 'Section sergeant · rifleman', color: '#9bd16a',
+  ruwan: { model: 'soldier_army', name: 'Sgt. Ruwan Jayasekara', short: 'Sgt. Ruwan', role: 'Section sergeant · rifleman', color: '#9bd16a',
     bio: 'Fifteen years in uniform. His older brother was at Elephant Pass when it fell in 2000. Calls you "Sir" with a grin.' },
-  nimal: { name: 'Cpl. Nimal "Nimo" Fernando', short: 'Cpl. Nimal', role: 'Support gunner', color: '#7fc8e8',
+  nimal: { model: 'soldier_army', name: 'Cpl. Nimal "Nimo" Fernando', short: 'Cpl. Nimal', role: 'Support gunner', color: '#7fc8e8',
     bio: 'From Negombo. Jokes under fire, misses his mother\'s kiribath and organises every celebration.' },
-  kasun: { name: 'L/Cpl. Kasun Herath', short: 'L/Cpl. Kasun', role: 'Recon · marksman', color: '#e89a6a',
+  kasun: { model: 'soldier_ghillie', ai: 'marksman', name: 'L/Cpl. Kasun Herath', short: 'L/Cpl. Kasun', role: 'Recon · marksman (SVD, ghillie suit)', color: '#e89a6a',
     bio: 'The youngest. Writes letters to his little sister in Anuradhapura. Sees everything first.' },
-  prakash: { name: 'Pte. Prakash Rajan', short: 'Pte. Prakash', role: 'Medic · Tamil interpreter', color: '#d79be8',
+  prakash: { model: 'soldier_sf', name: 'Pte. Prakash Rajan', short: 'Pte. Prakash', role: 'Medic · Tamil interpreter', color: '#d79be8',
     bio: 'A Tamil soldier from Batticaloa. Patches everyone up, and speaks to frightened families in their own language.' },
-  sunil: { name: 'Pte. Sunil Dias', short: 'Pte. Sunil', role: 'Rifleman (replacement)', color: '#b8c4a0',
+  sunil: { model: 'soldier_army', name: 'Pte. Sunil Dias', short: 'Pte. Sunil', role: 'Rifleman (replacement)', color: '#b8c4a0',
     bio: 'Joins the section after Kilinochchi. Eager, nervous, brave.' },
   command: { name: 'Lion Actual', short: 'Command', role: 'Radio', color: '#f2eedf' },
   saraswathi: { name: 'Mrs. Saraswathi', short: 'Saraswathi', role: 'Civilian', color: '#f0d0a0' },
@@ -64,7 +64,8 @@ export const STORY = {
     objectives: {
       1: [
         ['ruwan', 'Outpost is clear. Good work, Sir. The anicut is north-east — follow the canal.'],
-        ['tip', 'Walk over a supply crate to refill your ammunition.'],
+        ['tip', 'Walk over a supply crate to refill ammunition and grenades. C crouches, Z goes prone — bushes hide you.'],
+        ['tip', 'Squad orders: T follow / hold · V send Bravo team to where you aim · X weapons free / tight.'],
       ],
       2: [
         ['command', 'Two-One, expect heavier resistance at the gates. Other sections are pushing on your flank.'],
@@ -96,9 +97,13 @@ export const STORY = {
       ['tip', 'Enemies who have not seen you will not fire. Gunfire alerts everyone nearby — pick your moment.'],
     ],
     objectives: {
-      1: [['prakash', 'This jungle is like the one near my grandmother\'s village. When it is this quiet, someone is listening.']],
-      2: [['ruwan', 'There it is. Baron\'s Cap. The British named it. The Tigers held it for twenty years.']],
-      3: [
+      1: [
+        ['kasun', 'Siren on a pole beside the second camp. If one of them reaches it, the whole jungle wakes up.'],
+        ['tip', 'Press B for binoculars and look at sentries to mark them. Hold E at the alarm to sabotage it. C crouches, Z goes prone.'],
+      ],
+      2: [['prakash', 'This jungle is like the one near my grandmother\'s village. When it is this quiet, someone is listening.']],
+      3: [['ruwan', 'There it is. Baron\'s Cap. The British named it. The Tigers held it for twenty years.']],
+      4: [
         ['command', 'All teams converge on the rock. Final push.'],
         ['kasun', 'Sentries on the slopes. I\'ll call them out.'],
       ],
@@ -125,7 +130,7 @@ export const STORY = {
     objectives: {
       1: [
         ['kasun', 'Three boats. Fuelled — they were leaving tonight.'],
-        ['tip', 'Hold E beside a boat to plant a charge, then move away.'],
+        ['tip', 'Hold E beside a boat to plant a charge, then move away. Press 3 for Kasun\'s spare SVD — right-click to scope.'],
       ],
       2: [
         ['command', 'Good work. Pooneryn is ahead on the A-32. Push on.'],

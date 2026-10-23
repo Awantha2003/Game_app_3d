@@ -34,7 +34,11 @@ export const MISSIONS = [
     },
     player: { x: 0, z: 100 },
     allies: 3,
+    insertion: 'apc',
     layout(w) {
+      w.tower(14, 36, 0, 'outpost');
+      w.tower(-4, -60, 0.4, 'gate');
+      w.alarm(10, -66, 0.2, 'gate');
       w.scatter('tree_jungle', 70, { x0: -118, x1: -70, z0: -118, z1: 118 });
       w.scatter('tree_jungle', 50, { x0: 60, x1: 118, z0: -118, z1: 118 });
       w.scatter('palm_coconut', 40, { x0: -70, x1: 30, z0: -118, z1: 118 }, { avoid: [[0, 100, 15], [0, 30, 14], [10, -40, 18]] });
@@ -82,7 +86,11 @@ export const MISSIONS = [
     },
     player: { x: -10, z: 105 },
     allies: 3,
+    insertion: 'heli',
     layout(w) {
+      w.tower(14, 30, 0.2, 'camp1');
+      w.tower(-6, -30, 1.1, 'camp2');
+      w.alarm(-26, -12, 0.5, 'camp2');
       w.prop('rock_outcrop', 0, -78, 0, 1.3);
       w.prop('rock_small', 25, -40, 0, 2); w.prop('rock_small', -30, 10, 1, 1.6);
       w.scatter('tree_jungle', 240, { x0: -118, x1: 118, z0: -118, z1: 118 },
@@ -100,6 +108,7 @@ export const MISSIONS = [
     },
     objectives: [
       { type: 'clear', tag: 'camp1', text: 'Destroy the first jungle camp' },
+      { type: 'alarm', tag: 'camp2', text: 'Sabotage the alarm at the second camp' },
       { type: 'clear', tag: 'camp2', text: 'Clear the second camp' },
       { type: 'reach', pos: [0, -48], r: 10, text: 'Reach the foot of Baron\'s Cap' },
       { type: 'clear', tag: 'peak', text: 'Eliminate the last defenders of Thoppigala', spawn: [{ x: 30, z: -90, n: 3, tag: 'peak' }] },
@@ -128,13 +137,16 @@ export const MISSIONS = [
         return -3 + land * (3.2 + fbm(x * 0.03, z * 0.03) * 1.5);
       },
     },
-    player: { x: 10, z: 105 },
+    player: { x: -33, z: 100 },
     allies: 3,
+    insertion: 'boat',
     layout(w) {
-      w.scatter('palm_palmyrah', 70, { x0: -30, x1: 118, z0: -118, z1: 118 }, { avoid: [[10, 105, 12], [-35, 20, 18], [10, -80, 25]] });
+      w.tower(-14, 8, 0.3, 'base');
+      w.alarm(-20, 34, 1.2, 'base');
+      w.scatter('palm_palmyrah', 70, { x0: -30, x1: 118, z0: -118, z1: 118 }, { avoid: [[10, 105, 12], [-33, 100, 10], [-35, 20, 18], [10, -80, 25]] });
       w.scatter('palm_coconut', 45, { x0: -40, x1: 60, z0: -118, z1: 118 }, { avoid: [[10, 105, 12], [-35, 20, 18], [10, -80, 25]] });
       w.scatter('bush', 120, { x0: -35, x1: 118, z0: -118, z1: 118 }, { avoid: [[10, 105, 8]] });
-      w.prop('buffel', 18, 112, -0.2); w.prop('supplies', 4, 110, 0);
+      w.prop('buffel', 18, 112, -0.2); w.prop('supplies', -26, 106, 0);
       // Sea Tiger boat yard at Nachchikuda
       w.target('boat', -44, 10, { model: 'seatiger_boat', rot: 1.4, label: 'Sea Tiger boat', time: 2.5, plant: true });
       w.target('boat', -43, 22, { model: 'seatiger_boat', rot: 1.7, label: 'Sea Tiger boat', time: 2.5, plant: true });
@@ -178,7 +190,9 @@ export const MISSIONS = [
     player: { x: 0, z: 105 },
     allies: 4,
     shelling: true,
+    insertion: 'apc',
     layout(w) {
+      w.tower(22, -10, 0.2, 'town');
       // the ditch-cum-earth-bund line with one breach point at x = 0
       for (let x = -110; x <= 110; x += 20) {
         if (Math.abs(x) < 12) continue;
@@ -232,7 +246,11 @@ export const MISSIONS = [
     player: { x: 0, z: 108 },
     allies: 4,
     shelling: true,
+    insertion: 'heli',
     layout(w) {
+      w.tower(6, 66, 0, 'south');
+      w.tower(-6, -42, 0.3, 'base');
+      w.alarm(20, -52, 0, 'base');
       w.scatter('bush', 60, { x0: -14, x1: 30, z0: -118, z1: 118 }, { avoid: [[0, 108, 6]] });
       w.scatter('palm_palmyrah', 18, { x0: -14, x1: 30, z0: -118, z1: 118 }, { avoid: [[0, 108, 8]] });
       w.prop('buffel', 4, 116, 0); w.prop('supplies', -4, 102, 0);
@@ -277,6 +295,7 @@ export const MISSIONS = [
     player: { x: -20, z: 100 },
     allies: 4,
     shelling: true,
+    insertion: 'apc',
     layout(w) {
       w.scatter('palm_coconut', 90, { x0: -118, x1: 30, z0: -118, z1: 118 }, { avoid: [[-20, 100, 14], [-5, -55, 14]] });
       w.scatter('bush', 120, { x0: -118, x1: 30, z0: -118, z1: 118 }, { avoid: [[-20, 100, 8], [-5, -55, 10]] });

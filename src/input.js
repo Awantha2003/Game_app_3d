@@ -19,6 +19,8 @@ export class Input {
       this.keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
+    this.wheel = 0;
+    window.addEventListener('wheel', (e) => { if (this.locked) this.wheel += Math.sign(e.deltaY); }, { passive: true });
     window.addEventListener('blur', () => { this.keys.clear(); this.fire = false; this.aim = false; });
 
     canvas.addEventListener('mousedown', (e) => {
@@ -61,6 +63,12 @@ export class Input {
 
   endFrame() {
     this.pressed.clear();
+  }
+
+  consumeWheel() {
+    const w = this.wheel;
+    this.wheel = 0;
+    return w;
   }
 
   resetLook() {

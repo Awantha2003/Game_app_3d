@@ -29,10 +29,36 @@
     <div class="status">
       <div class="hp"><div class="hp-label">HEALTH</div><div class="hp-bar"><div></div></div></div>
     </div>
-    <div class="ammo"><span class="ammo-mag">30</span><span class="ammo-res">/ 240</span><div class="ammo-name">T-56</div></div>
+    <div class="ammo"><span class="ammo-mag">30</span><span class="ammo-res">/ 240</span><div class="ammo-name">T-56</div><div class="ammo-gren"></div></div>
     <div class="vignette"></div>
     <div class="squad"></div>
+    <div class="detect"></div>
+    <div class="markers"></div>
+    <div class="stealth" data-level="green">HIDDEN</div>
+    <div class="stance-ind"></div>
+    <div class="orders"></div>
+    <div class="alarm-banner">⚠ ALARM ⚠</div>
+    <div class="insert-skip">Press Space to skip</div>
+    <div class="scope">
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
+        <defs><mask id="scope-mask"><rect x="-200" y="-200" width="560" height="490" fill="white" /><circle cx="80" cy="45" r="40" fill="black" /></mask></defs>
+        <rect x="-200" y="-200" width="560" height="490" fill="#000" mask="url(#scope-mask)" />
+        <g stroke="#000" stroke-width="0.25"><line x1="40" y1="45" x2="76" y2="45" /><line x1="84" y1="45" x2="120" y2="45" /><line x1="80" y1="5" x2="80" y2="41" /><line x1="80" y1="49" x2="80" y2="85" /></g>
+        <g stroke="#000" stroke-width="0.18"><line x1="78.5" y1="51" x2="81.5" y2="51" /><line x1="79" y1="56" x2="81" y2="56" /><line x1="79.3" y1="61" x2="80.7" y2="61" /></g>
+        <circle cx="80" cy="45" r="0.35" fill="#c0301a" />
+      </svg>
+      <div class="breath"><div></div></div><div class="scope-hint">Hold SHIFT to steady your breath</div>
+    </div>
+    <div class="binos">
+      <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
+        <defs><mask id="binos-mask"><rect x="-200" y="-200" width="560" height="490" fill="white" /><circle cx="62" cy="45" r="33" fill="black" /><circle cx="98" cy="45" r="33" fill="black" /></mask></defs>
+        <rect x="-200" y="-200" width="560" height="490" fill="#000" mask="url(#binos-mask)" />
+        <g stroke="rgba(255,255,255,0.5)" stroke-width="0.2"><line x1="75" y1="45" x2="85" y2="45" /><line x1="80" y1="40" x2="80" y2="50" /></g>
+      </svg>
+      <div class="binos-range"></div><div class="binos-hint">Look at hostiles to mark them · B to lower</div>
+    </div>
   </div>
+  <div id="map" class="hidden"><canvas></canvas><div class="map-info"></div></div>
 
   <!-- touch controls -->
   <div id="touch" class="hidden">
@@ -143,7 +169,7 @@
         </label>
       </div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim · Shift sprint · R reload · E interact · Esc pause
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Esc pause
       </div>
       <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn" data-act="prologue">Watch prologue</button></div>
     </div>
@@ -187,7 +213,7 @@
       <h2>Paused</h2>
       <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim · Shift sprint · R reload · E interact · Esc pause
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Esc pause
       </div>
     </div>
 

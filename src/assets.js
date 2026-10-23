@@ -7,6 +7,7 @@ export const MODEL_NAMES = [
   'soldier_army', 'soldier_ltte', 'civilian', 'buffel', 'seatiger_boat', 'bunker', 'earth_bund',
   'house', 'house_ruined', 'water_tower', 'sluice_gate', 'palm_coconut', 'palm_palmyrah',
   'tree_jungle', 'bush', 'rock_outcrop', 'rock_small', 'supplies', 'sandbag_wall',
+  'watchtower', 'alarm', 'soldier_sf', 'soldier_ghillie', 'wpn_svd', 'wpn_pistol', 'helicopter', 'arrow_boat', 'grenade',
 ];
 
 export const models = {};

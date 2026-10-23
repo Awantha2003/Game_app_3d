@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import './style.css';
-import { loadModels } from './assets.js';
+import { loadModels, models } from './assets.js';
 import { Audio } from './audio.js';
 import { FX } from './fx.js';
 import { Input } from './input.js';
 import { MISSIONS } from './missions.js';
 import { Prologue } from './cinematic.js';
+import { Insertion } from './insertion.js';
 import { Profile } from './profile.js';
 import { Radio } from './radio.js';
 import {
@@ -15,7 +16,13 @@ import { Unit } from './units.js';
 import { World } from './world.js';
 
 const $ = (s, r = document) => r.querySelector(s);
-const MAG = 30;
+
+// The player's weapons. Noise is how far (m) the shot is heard.
+const WEAPONS = [
+  { id: 't56', name: 'T-56 rifle', mag: 30, reserve: 240, interval: 0.1, auto: true, body: 36, head: 120, spreadHip: 0.012, spreadAim: 0.003, recoil: 0.009, noise: 70, reload: 2.2 },
+  { id: 'pistol', name: 'Pistol · suppressed', mag: 8, reserve: 48, interval: 0.25, auto: false, body: 34, head: 110, spreadHip: 0.01, spreadAim: 0.004, recoil: 0.014, noise: 9, reload: 1.6, suppressed: true },
+  { id: 'svd', name: 'SVD Dragunov', mag: 10, reserve: 40, interval: 0.45, auto: false, body: 110, head: 200, spreadHip: 0.03, spreadAim: 0.0004, recoil: 0.03, noise: 130, reload: 2.8, scope: true },
+];
 
 class Game {
   constructor() {
@@ -258,6 +265,8 @@ class Game {
     if (this.state === 'cinematic') return;
     this.state = 'menu';
     this.radio.clear();
+    this.audio.siren(false);
+    this.toggleMap(false);
     if (document.pointerLockElement) document.exitPointerLock();
     const d = this.profile.data;
     const next = MISSIONS.findIndex((m) => !d.done.includes(m.id));
@@ -293,8 +302,27 @@ class Game {
     this.toast(`${this.mission.name.toUpperCase()} — ${this.mission.date}`, true);
     this.audio.stinger(true);
     this.radio.clear();
+    if (this.mission.insertion) {
+      this.insertion = new Insertion(this, this.mission.insertion);
+      $('.insert-skip').classList.add('on');
+      $('#hud').classList.add('cinema');
+    } else this.startOperations();
+  }
+
+  // gameplay proper begins once the squad is on the ground
+  startOperations() {
+    $('.insert-skip').classList.remove('on');
+    $('#hud').classList.remove('cinema');
     this.radio.say(STORY[this.mission.id].intro);
     this.activateObjective(0);
+  }
+
+  skipInsertion() {
+    if (!this.insertion) return;
+    this.insertion.finish();
+    this.insertion = null;
+    this.radio.clear();
+    this.startOperations();
   }
 
   pause() {
@@ -352,17 +380,17 @@ class Game {
     this.clearMission();
     this.world = new World(this.scene, this.mission, 1000 + i * 77);
     const m = this.mission;
-    this.player = new Unit(this, 'army', m.player.x, m.player.z, { player: true, yaw: Math.PI });
+    this.player = new Unit(this, 'army', m.player.x, m.player.z, { player: true, yaw: Math.PI, model: 'soldier_sf' });
     this.units = [this.player];
     const squad = STORY[m.id].squad;
     for (let k = 0; k < m.allies; k++) {
-      const name = squad[k] ? CHARACTERS[squad[k]].short : undefined;
-      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI, name });
+      const c = squad[k] ? CHARACTERS[squad[k]] : {};
+      const a = new Unit(this, 'army', m.player.x + (k % 2 ? 3 : -3), m.player.z + 4 + k * 2, { index: k, yaw: Math.PI, name: c.short, model: c.model, role: c.ai });
       this.units.push(a);
     }
     let idx = 10;
     for (const s of this.world.spawns) {
-      const u = new Unit(this, s.team, s.x, s.z, { tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI });
+      const u = new Unit(this, s.team, s.x, s.z, { tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI, patrol: s.patrol, sentry: s.sentry });
       if (s.team === 'ltte') u.yaw = Math.atan2(m.player.x - s.x, m.player.z - s.z) + (Math.random() - 0.5) * 1.8;
       this.units.push(u);
     }
@@ -377,8 +405,25 @@ class Game {
 
     this.yaw = Math.PI;
     this.pitch = 0;
-    this.ammo = MAG;
-    this.reserve = 240;
+    this.wi = 0;
+    this.wstate = WEAPONS.map((w) => ({ ammo: w.mag, reserve: w.reserve }));
+    this.ammo = WEAPONS[0].mag;
+    this.reserve = WEAPONS[0].reserve;
+    this.grenades = 3;
+    this.projectiles = [];
+    this.binos = false;
+    this.breath = 1;
+    this.swayT = 0;
+    this.stepDist = 0;
+    this.wasFiring = false;
+    this.insertion = null;
+    this.mapBase = null;
+    this.squadOrders = { mode: 'follow', fire: 'tight', bravo: 'follow' };
+    this.equipVisuals();
+    $('.obj-mission').textContent = '';
+    $('.f-title').textContent = '';
+    $('.obj-text').textContent = '';
+    $('.obj-sub').textContent = '';
     this.reloading = 0;
     this.fireCooldown = 0;
     this.bloom = 0;
@@ -399,6 +444,12 @@ class Game {
   }
 
   clearMission() {
+    this.audio.siren(false);
+    for (const g of this.projectiles || []) this.scene.remove(g.obj);
+    this.projectiles = [];
+    this.insertion?.finish();
+    this.insertion = null;
+    this.toggleMap(false);
     for (const u of this.units) u.remove();
     this.units = [];
     this.fx.clear();
@@ -455,6 +506,10 @@ class Game {
       const n = ts.filter((t) => t.done).length;
       sub = ts.length > 1 ? `${n} / ${ts.length}` : '';
       done = ts.every((t) => t.done && !t.pending);
+    } else if (o.type === 'alarm') {
+      const alarms = this.world.alarms.filter((a) => a.tag === o.tag);
+      if (alarms.some((a) => a.triggered && !a.disabled)) { done = true; this.toast('The alarm was raised — fight your way through!'); }
+      else done = alarms.every((a) => a.disabled);
     } else if (o.type === 'escort') {
       const waiting = this.units.filter((u) => u.team === 'civ' && u.state === 'wait').length;
       sub = waiting ? `Reach the civilians (${waiting} waiting)` : `Civilians safe: ${this.civSafe} / ${this.civTotal}`;
@@ -485,6 +540,10 @@ class Game {
       ts.sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z));
       return ts[0] ? new THREE.Vector3(ts[0].x, ts[0].y + 1.5, ts[0].z) : null;
     }
+    if (o.type === 'alarm') {
+      const a = this.world.alarms.find((a) => a.tag === o.tag && !a.disabled);
+      return a ? new THREE.Vector3(a.x, a.y + 3.5, a.z) : null;
+    }
     if (o.type === 'escort') {
       const waiting = this.units.find((u) => u.team === 'civ' && u.state === 'wait');
       if (waiting) return waiting.pos.clone().setY(waiting.pos.y + 2);
@@ -504,6 +563,8 @@ class Game {
         hasCivilians: this.civTotal > 0, civilianIncidents: this.civIncidents,
       });
       this.lastRecord = rec;
+      this.audio.siren(false);
+      this.toggleMap(false);
       this.state = 'complete';
       this.radio.clear();
       this.audio.stinger(m.id !== 'nandikadal');
@@ -587,6 +648,7 @@ class Game {
     if (this.endTimer > 0) return;
     this.endTimer = 2;
     this.endAction = () => {
+      this.audio.siren(false);
       this.state = 'failed';
       if (document.pointerLockElement) document.exitPointerLock();
       $('.f-title').textContent = reason;
@@ -599,7 +661,10 @@ class Game {
   onUnitKilled(u) {
     if (u.isPlayer) { this.radio.clear(); this.missionFailed('You were killed in action.'); return; }
     if (u.team === 'civ') { this.missionFailed('A civilian was killed. Protecting civilians is your first duty.'); return; }
-    if (u.team === 'ltte') this.killfeed('LTTE cadre neutralised');
+    if (u.team === 'ltte') {
+      this.killfeed('LTTE cadre neutralised');
+      for (const a of this.world.alarms) if (a.runner === u) { a.runner = null; this.toast('Alarm runner stopped'); }
+    }
   }
 
   onCivilianSafe() {
@@ -623,15 +688,108 @@ class Game {
     void from;
   }
 
-  noise(pos, radius) {
-    // gunfire wakes up everyone nearby, except groups that belong to a later objective
-    this.alertLevel = 8;
-    const later = new Set(this.mission.objectives.slice(this.objIndex + 1).map((o) => o.tag).filter(Boolean));
-    for (const u of this.units) {
-      if (u.team !== 'ltte' || !u.alive || u.state !== 'idle') continue;
-      const d = u.pos.distanceTo(pos);
-      if (d < (later.has(u.tag) ? 25 : radius)) u.alert(this.player);
+  // gunfire and footsteps; groups belonging to a later objective only react up close
+  noise(pos, radius, gunshot = true) {
+    if (gunshot && radius > 20) this.alertLevel = 8;
+    for (const u of this.units) u.hear(pos, radius, gunshot);
+  }
+
+  isLaterGroup(tag) {
+    const objs = this.mission.objectives;
+    if (objs.slice(0, this.objIndex + 1).some((o) => o.tag === tag)) return false;
+    return objs.slice(this.objIndex + 1).some((o) => o.tag === tag);
+  }
+
+  // ------------------------------------------------------------ alarms
+
+  onEnemyAlerted(u) {
+    if (u.sentry || !this.world) return;
+    let best = null;
+    for (const a of this.world.alarms) {
+      if (a.disabled || a.triggered || (a.runner && a.runner.alive)) continue;
+      const d = Math.hypot(a.x - u.pos.x, a.z - u.pos.z);
+      if (d < 90 && (!best || d < Math.hypot(best.x - u.pos.x, best.z - u.pos.z))) best = a;
     }
+    if (!best) return;
+    best.runner = u;
+    u.state = 'alarm';
+    u.marked = true;
+    this.toast('A cadre is running for the alarm — stop him!', true);
+  }
+
+  alarmFor(u) {
+    return this.world.alarms.find((a) => a.runner === u);
+  }
+
+  triggerAlarm(a) {
+    if (a.triggered || a.disabled) return;
+    a.triggered = true;
+    this.audio.siren(true);
+    this.toast('ALARM! Reinforcements are coming', true);
+    this.radio.say([['ruwan', 'That\'s the siren — they know we\'re here! Get to cover!']]);
+    for (const u of this.units) if (u.alive && u.team === 'ltte') { u.lastSeen = this.player.pos.clone(); u.enterCombat(this.player); }
+    let away = new THREE.Vector3(a.x - this.player.pos.x, 0, a.z - this.player.pos.z);
+    away = away.lengthSq() > 0.01 ? away.normalize() : new THREE.Vector3(0, 0, -1);
+    const S = this.world.size - 6;
+    for (let k = 0; k < 4; k++) {
+      let x = THREE.MathUtils.clamp(a.x + away.x * 40 + (Math.random() - 0.5) * 12, -S, S);
+      let z = THREE.MathUtils.clamp(a.z + away.z * 40 + (Math.random() - 0.5) * 12, -S, S);
+      if (this.world.isWater(x, z, 0)) { x = a.x + (Math.random() - 0.5) * 8; z = a.z + (Math.random() - 0.5) * 8; }
+      const u = new Unit(this, 'ltte', x, z, { tag: a.tag, index: 80 + k });
+      this.units.push(u);
+      u.lastSeen = this.player.pos.clone();
+      u.enterCombat(this.player);
+    }
+  }
+
+  // ------------------------------------------------------------ weapons
+
+  get W() {
+    return WEAPONS[this.wi];
+  }
+
+  equipVisuals() {
+    const p = this.player, rifle = p.parts.rifle;
+    if (!rifle) return;
+    const attach = (name) => {
+      const o = models[name].clone(true);
+      o.position.copy(rifle.position);
+      o.rotation.copy(rifle.rotation);
+      rifle.parent.add(o);
+      return o;
+    };
+    this.weaponObjs = { t56: rifle, svd: attach('wpn_svd'), pistol: attach('wpn_pistol') };
+    this.weaponObjs.pistol.position.set(-0.26, -0.3, 0.17);
+    this.showWeapon();
+  }
+
+  showWeapon() {
+    if (!this.weaponObjs) return;
+    for (const [id, o] of Object.entries(this.weaponObjs)) o.visible = id === this.W.id;
+    this.player.parts.muzzle = this.weaponObjs[this.W.id].getObjectByName('Muzzle');
+  }
+
+  switchWeapon(i) {
+    if (i === this.wi || i < 0 || i >= WEAPONS.length) return;
+    this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
+    this.wi = i;
+    ({ ammo: this.ammo, reserve: this.reserve } = this.wstate[i]);
+    this.reloading = 0;
+    this.fireCooldown = 0.4;
+    this.binos = false;
+    this.showWeapon();
+    this.audio.click();
+  }
+
+  resupply() {
+    this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
+    WEAPONS.forEach((w, i) => { this.wstate[i].reserve = w.reserve; });
+    this.reserve = this.W.reserve;
+    this.grenades = 3;
+  }
+
+  isScoped() {
+    return this.W.scope && this.input.aim && this.reloading <= 0 && this.player.alive && !this.binos;
   }
 
   // ------------------------------------------------------------ player
@@ -641,55 +799,94 @@ class Game {
     if (!p.alive) { p.update(dt); p.sync(dt); return; }
 
     const look = inp.consumeLook();
-    const sens = (inp.aim ? 0.0011 : 0.0022) * this.profile.settings.sensitivity;
+    const zoom = this.camera.fov / 70;
+    const sens = 0.0022 * zoom * this.profile.settings.sensitivity;
     this.yaw -= look.x * sens;
     this.pitch = THREE.MathUtils.clamp(this.pitch - look.y * sens, -1.0, 0.75);
 
+    // stance
+    if (inp.hit('KeyC')) p.stance = p.stance === 'crouch' ? 'stand' : 'crouch';
+    if (inp.hit('KeyZ')) p.stance = p.stance === 'prone' ? 'stand' : 'prone';
+    if (inp.hit('Space')) p.stance = 'stand';
+
+    const scoped = this.isScoped();
     const mv = inp.moveVec;
-    const sprint = inp.sprint && mv.y > 0 && !inp.aim && this.reloading <= 0;
-    const speed = inp.aim ? 2.4 : sprint ? 6.8 : 4.3;
+    const sprint = inp.sprint && mv.y > 0 && !inp.aim && this.reloading <= 0 && p.stance === 'stand' && !this.binos;
+    let speed = p.stance === 'prone' ? 0.9 : p.stance === 'crouch' ? 2.2 : sprint ? 6.8 : 4.3;
+    if (inp.aim || this.binos) speed = Math.min(speed, p.stance === 'stand' ? 2.4 : speed * 0.7);
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);
     const rx = -Math.cos(this.yaw), rz = Math.sin(this.yaw);
+    const sx = p.pos.x, sz = p.pos.z;
     p.move(fx * mv.y + rx * mv.x, fz * mv.y + rz * mv.x, speed * Math.min(1, Math.hypot(mv.x, mv.y)), dt);
     p.separate();
     p.yaw = this.yaw;
     p.pitch = this.pitch;
     p.sync(dt);
 
+    // footsteps can be heard
+    this.stepDist += Math.hypot(p.pos.x - sx, p.pos.z - sz);
+    if (this.stepDist > (sprint ? 2.4 : 1.8)) {
+      this.stepDist = 0;
+      const r = sprint ? 14 : p.stance === 'stand' ? 6 : p.stance === 'crouch' ? 2.5 : 0.8;
+      this.noise(p.pos, r, false);
+      if (p.stance !== 'prone') this.audio.burst({ dur: 0.06, freq: 500, vol: sprint ? 0.12 : 0.06 });
+    }
+
+    // breath for the scope
+    if (scoped && inp.sprint) this.breath = Math.max(0, this.breath - dt / 4);
+    else this.breath = Math.min(1, this.breath + dt / 6);
+
     // health regeneration
     if (this.time - this.lastPlayerHit > 5) p.hp = Math.min(100, p.hp + 9 * dt);
 
-    // reload
-    if ((inp.hit('KeyR') || (this.ammo === 0 && inp.fire)) && this.reloading <= 0 && this.ammo < MAG && this.reserve > 0) {
-      this.reloading = 2.2;
+    // weapons
+    if (inp.hit('Digit1')) this.switchWeapon(0);
+    if (inp.hit('Digit2')) this.switchWeapon(1);
+    if (inp.hit('Digit3')) this.switchWeapon(2);
+    const wheel = inp.consumeWheel();
+    if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : WEAPONS.length - 1)) % WEAPONS.length);
+    if (inp.hit('KeyB')) { this.binos = !this.binos; this.audio.click(); }
+    if (inp.hit('KeyG') && this.grenades > 0 && !this.binos) this.throwGrenade();
+
+    const W = this.W;
+    if ((inp.hit('KeyR') || (this.ammo === 0 && inp.fire)) && this.reloading <= 0 && this.ammo < W.mag && this.reserve > 0) {
+      this.reloading = W.reload;
+      this.binos = false;
       this.audio.click();
-      this.toastReload = true;
     }
     if (this.reloading > 0) {
       this.reloading -= dt;
       if (this.reloading <= 0) {
-        const take = Math.min(MAG - this.ammo, this.reserve);
+        const take = Math.min(W.mag - this.ammo, this.reserve);
         this.ammo += take;
         this.reserve -= take;
         this.audio.click();
       }
     }
 
-    // fire
     this.fireCooldown -= dt;
     this.bloom = Math.max(0, this.bloom - dt * 0.12);
-    if (inp.fire && !sprint && this.reloading <= 0 && this.fireCooldown <= 0) {
+    const pull = inp.fire && (W.auto || !this.wasFiring);
+    this.wasFiring = inp.fire;
+    if (pull && !sprint && !this.binos && this.reloading <= 0 && this.fireCooldown <= 0) {
       if (this.ammo > 0) this.shoot();
       else if (this.reserve <= 0) { this.audio.click(); this.fireCooldown = 0.3; }
     }
+    if (this.binos) this.markWithBinoculars();
+
+    // squad orders
+    if (inp.hit('KeyT')) this.orderSquad();
+    if (inp.hit('KeyV')) this.orderBravo();
+    if (inp.hit('KeyX')) this.toggleFire();
 
     // resupply
     this.supplyCooldown -= dt;
     for (const s of this.world.supplies) {
-      if (Math.hypot(s.x - p.pos.x, s.z - p.pos.z) < 3 && this.reserve < 240 && this.supplyCooldown <= 0) {
-        this.reserve = 240;
+      const low = this.reserve < W.reserve || this.grenades < 3;
+      if (Math.hypot(s.x - p.pos.x, s.z - p.pos.z) < 3 && low && this.supplyCooldown <= 0) {
+        this.resupply();
         this.supplyCooldown = 3;
-        this.toast('Ammunition resupplied');
+        this.toast('Ammunition and grenades resupplied');
       }
     }
 
@@ -697,13 +894,14 @@ class Game {
   }
 
   shoot() {
-    const p = this.player;
+    const p = this.player, W = this.W;
     this.ammo--;
     this.shots++;
-    this.fireCooldown = 0.1; // ~600 rounds per minute
+    this.fireCooldown = W.interval;
     const moving = (p.speed || 0) > 0.5;
-    const spread = (this.input.aim ? 0.003 : 0.012) + (moving ? 0.012 : 0) + this.bloom;
-    this.bloom = Math.min(0.04, this.bloom + 0.006);
+    const stanceMul = p.stance === 'prone' ? 0.5 : p.stance === 'crouch' ? 0.7 : 1;
+    const spread = ((this.input.aim ? W.spreadAim : W.spreadHip) + (moving ? 0.012 : 0) + this.bloom) * stanceMul;
+    this.bloom = Math.min(0.04, this.bloom + W.recoil * 0.6);
 
     const cam = this.camera;
     const dir = new THREE.Vector3();
@@ -717,13 +915,13 @@ class Game {
     const origin = cam.position.clone();
     const toPlayer = new THREE.Vector3().subVectors(p.pos, origin);
     origin.addScaledVector(dir, Math.max(0, toPlayer.dot(dir)));
-    const res = this.world.raycast(origin, dir, 350, p);
+    const res = this.world.raycast(origin, dir, 450, p);
     const muzzle = p.muzzleWorld(new THREE.Vector3());
-    const end = res ? res.point : origin.clone().addScaledVector(dir, 350);
-    this.fx.tracer(muzzle, end);
-    this.fx.muzzle(muzzle);
-    this.audio.shot(null, true);
-    this.noise(p.pos, 70);
+    const end = res ? res.point : origin.clone().addScaledVector(dir, 450);
+    if (!W.suppressed || Math.random() < 0.3) this.fx.tracer(muzzle, end);
+    if (!W.suppressed) this.fx.muzzle(muzzle);
+    this.audio.weapon(W.id);
+    this.noise(p.pos, W.noise, true);
 
     if (res?.kind === 'unit') {
       const u = res.unit;
@@ -731,15 +929,14 @@ class Game {
         this.toast('Check your fire — friendly!');
       } else if (u.team === 'civ') {
         // only shots aimed straight at a civilian hurt them; stray rounds are a warning
-        const aimed = this.world.raycast(origin, aimDir, 350, p);
+        const aimed = this.world.raycast(origin, aimDir, 450, p);
         if (aimed?.unit === u) u.damage(40, p);
         if (u.alive) this.toast('HOLD FIRE — civilians!', true);
         this.civIncidents++;
         this.storyEvent('civilianWarning');
       } else {
         this.hits++;
-        const dmg = res.head ? 120 : 36;
-        u.damage(dmg, p);
+        u.damage(res.head ? W.head : W.body, p);
         this.fx.hitPuff(res.point);
         const killed = !u.alive;
         if (killed && u.team === 'ltte') this.kills++;
@@ -750,9 +947,123 @@ class Game {
     }
 
     // recoil
-    this.pitch = Math.min(0.75, this.pitch + 0.006 + Math.random() * 0.006);
-    this.yaw += (Math.random() - 0.5) * 0.006;
+    this.pitch = Math.min(0.75, this.pitch + W.recoil * (0.6 + Math.random() * 0.6) * stanceMul);
+    this.yaw += (Math.random() - 0.5) * W.recoil * 0.6;
   }
+
+  throwGrenade() {
+    this.grenades--;
+    const p = this.player, d = new THREE.Vector3();
+    this.camera.getWorldDirection(d);
+    const pos = p.pos.clone().add(new THREE.Vector3(0, p.eyeHeight, 0)).addScaledVector(d, 0.6);
+    const vel = d.multiplyScalar(15).add(new THREE.Vector3(0, 4, 0));
+    const obj = models.grenade.clone(true);
+    obj.scale.setScalar(1.6);
+    this.scene.add(obj);
+    this.projectiles.push({ obj, pos, vel, fuse: 3 });
+    this.toast('Grenade out!');
+  }
+
+  updateProjectiles(dt) {
+    for (const g of this.projectiles) {
+      g.vel.y -= 18 * dt;
+      g.pos.addScaledVector(g.vel, dt);
+      const h = this.world.height(g.pos.x, g.pos.z);
+      if (g.pos.y < h + 0.06) {
+        g.pos.y = h + 0.06;
+        g.vel.y = Math.abs(g.vel.y) * 0.3;
+        g.vel.x *= 0.55; g.vel.z *= 0.55;
+      }
+      for (const c of this.world.colliders) {
+        if (c.y1 > g.pos.y && this.world.circleOverlap(c, g.pos.x, g.pos.z, 0.05)) { g.vel.x *= -0.4; g.vel.z *= -0.4; break; }
+      }
+      g.obj.position.copy(g.pos);
+      g.obj.rotation.x += dt * 8;
+      g.fuse -= dt;
+      if (g.fuse <= 0) {
+        this.scene.remove(g.obj);
+        this.explode(g.pos, 7.5, 220, this.player);
+      }
+    }
+    this.projectiles = this.projectiles.filter((g) => g.fuse > 0);
+  }
+
+  explode(pos, radius, damage, source) {
+    this.fx.explosion(pos);
+    this.audio.explosion(pos);
+    this.fx.shake = Math.max(this.fx.shake, 1.2 - pos.distanceTo(this.player.pos) / 40);
+    const from = pos.clone().add(new THREE.Vector3(0, 0.4, 0));
+    for (const u of this.units) {
+      if (!u.alive) continue;
+      const chest = u.pos.clone().add(new THREE.Vector3(0, Math.min(1, u.bodyHeight * 0.6), 0));
+      const d = chest.distanceTo(from);
+      if (d > radius || !this.world.lineOfSight(from, chest)) continue;
+      u.damage((u.isPlayer ? damage * 0.35 : damage) * (1 - d / radius), source);
+      if (u.isPlayer) this.onPlayerHit(pos);
+      if (source === this.player && u.team === 'ltte' && !u.alive) this.kills++;
+    }
+    this.noise(pos, 120, true);
+  }
+
+  markWithBinoculars() {
+    const cam = this.camera, d = new THREE.Vector3();
+    cam.getWorldDirection(d);
+    for (const u of this.units) {
+      if (!u.alive || u.team !== 'ltte' || u.marked) continue;
+      const to = u.eye.clone().sub(cam.position);
+      if (to.length() > 400 || to.normalize().angleTo(d) > 0.045) continue;
+      if (!this.world.lineOfSight(cam.position, u.eye.clone())) continue;
+      u.marked = true;
+      this.toast('Hostile marked');
+      this.audio.hitmark();
+    }
+  }
+
+  // ------------------------------------------------------------ squad orders
+
+  squadAllies() {
+    return this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup' && u.alive);
+  }
+
+  orderSquad() {
+    const holding = this.squadOrders.mode === 'follow';
+    this.squadOrders.mode = holding ? 'hold' : 'follow';
+    for (const a of this.squadAllies()) {
+      a.order = holding ? 'hold' : 'follow';
+      a.orderPos = holding ? a.pos.clone() : null;
+    }
+    const first = this.squadAllies()[0];
+    this.radio.say([[this.speakerKey(first), holding ? 'Holding here, Sir.' : 'On you, Sir. Moving.']]);
+  }
+
+  orderBravo() {
+    const d = new THREE.Vector3();
+    this.camera.getWorldDirection(d);
+    const hit = this.world.raycast(this.camera.position, d, 160, this.player, false);
+    if (!hit) { this.toast('Aim at the ground to send Bravo team'); return; }
+    const allies = this.squadAllies();
+    const bravo = allies.length > 1 ? allies.filter((a) => a.followSlot % 2 === 1) : allies;
+    bravo.forEach((a, i) => {
+      a.order = 'move';
+      a.orderPos = hit.point.clone().add(new THREE.Vector3((i - (bravo.length - 1) / 2) * 2.5, 0, 0));
+    });
+    this.squadOrders.bravo = 'move';
+    this.radio.say([[this.speakerKey(bravo[0]), `Bravo moving — ${Math.round(hit.t)} metres.`]]);
+  }
+
+  toggleFire() {
+    this.squadOrders.fire = this.squadOrders.fire === 'tight' ? 'free' : 'tight';
+    const first = this.squadAllies()[0];
+    this.radio.say([[this.speakerKey(first), this.squadOrders.fire === 'free' ? 'Weapons free!' : 'Weapons tight — we fire only if they spot us.']]);
+  }
+
+  speakerKey(u) {
+    const squad = STORY[this.mission.id].squad;
+    const k = squad.find((s) => CHARACTERS[s].short === u?.name);
+    return k || 'ruwan';
+  }
+
+  // ------------------------------------------------------------ interaction
 
   flashHitmarker(kill) {
     const h = $('.hitmarker');
@@ -763,34 +1074,52 @@ class Game {
     this.audio.hitmark();
   }
 
-  updateInteraction(dt) {
-    const o = this.currentObjective();
-    const prompt = $('.prompt');
-    let target = null;
+  findInteraction() {
+    const o = this.currentObjective(), p = this.player.pos;
+    const near = (x, z, r) => Math.hypot(x - p.x, z - p.z) < r;
     if (o?.type === 'interact') {
-      const p = this.player.pos;
-      target = this.world.targets.find((t) => t.tag === o.tag && !t.done && Math.hypot(t.x - p.x, t.z - p.z) < (t.obj ? 7 : 3.5));
+      const t = this.world.targets.find((t) => t.tag === o.tag && !t.done && near(t.x, t.z, t.obj ? 7 : 3.5));
+      if (t) {
+        return {
+          label: `${t.plant ? 'Plant charge on' : 'Operate'} ${t.label}`, time: t.time,
+          done: () => {
+            t.done = true;
+            if (t.plant) { t.pending = true; this.toast('Charge set — move away! (4 s)'); this.charges.push({ target: t, timer: 4 }); }
+            else this.toast('The sluice gates are open — water is flowing to the paddy fields again', true);
+          },
+        };
+      }
     }
-    if (!target) {
+    const a = this.world.alarms.find((a) => !a.disabled && near(a.x, a.z, 2.6));
+    if (a) {
+      return {
+        label: 'Sabotage the alarm', time: 3,
+        done: () => { a.disabled = true; if (a.triggered) this.audio.siren(false); this.toast('Alarm sabotaged', true); },
+      };
+    }
+    const pl = this.player;
+    if (pl.towerCenter) return { label: 'Climb down the tower', time: 0.8, done: () => pl.setTower(null) };
+    const tw = this.world.towers.find((t) => near(t.x, t.z, 2.8));
+    if (tw) return { label: 'Climb the watchtower', time: 0.8, done: () => pl.setTower(tw) };
+    return null;
+  }
+
+  updateInteraction(dt) {
+    const it = this.findInteraction();
+    const prompt = $('.prompt');
+    if (!it) {
       prompt.classList.remove('on');
       this.interactProgress = 0;
       return;
     }
     prompt.classList.add('on');
     const key = this.input.touch ? 'E button' : 'E';
-    $('.prompt-text').textContent = `Hold ${key}: ${target.plant ? 'Plant charge on' : 'Operate'} ${target.label}`;
+    $('.prompt-text').textContent = `Hold ${key}: ${it.label}`;
     if (this.input.action) {
-      this.interactProgress += dt / target.time;
+      this.interactProgress += dt / it.time;
       if (this.interactProgress >= 1) {
         this.interactProgress = 0;
-        target.done = true;
-        if (target.plant) {
-          target.pending = true;
-          this.toast('Charge set — move away! (4 s)');
-          this.charges.push({ target, timer: 4 });
-        } else {
-          this.toast('The sluice gates are open — water is flowing to the paddy fields again', true);
-        }
+        it.done();
       }
     } else {
       this.interactProgress = Math.max(0, this.interactProgress - dt);
@@ -800,15 +1129,9 @@ class Game {
 
   detonate(t) {
     const pos = new THREE.Vector3(t.x, Math.max(t.y, this.world.water ?? t.y), t.z);
-    this.fx.explosion(pos);
-    this.audio.explosion(pos);
-    this.fx.shake = Math.max(this.fx.shake, 1.2 - pos.distanceTo(this.player.pos) / 40);
     if (t.obj) this.world.group.remove(t.obj);
     this.world.colliders = this.world.colliders.filter((c) => c.ref !== t);
-    for (const u of this.units) {
-      const d = u.pos.distanceTo(pos);
-      if (u.alive && d < 7) u.damage(u.isPlayer ? 70 * (1 - d / 7) : 200, null);
-    }
+    this.explode(pos, 7, 200, this.player);
     t.pending = false;
     this.killfeed('Sea Tiger boat destroyed');
   }
@@ -816,33 +1139,57 @@ class Game {
   // ------------------------------------------------------------ camera
 
   updateCamera(dt, snap = false) {
-    const p = this.player;
-    const aim = this.input.aim && p.alive;
-    const d = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch));
-    const right = new THREE.Vector3(-Math.cos(this.yaw), 0, Math.sin(this.yaw));
-    const pivot = p.pos.clone().add(new THREE.Vector3(0, p.alive ? 1.78 : 0.8, 0));
-    const dist = aim ? 1.6 : 3.2;
-    const side = aim ? 0.6 : 0.85;
-    let want = pivot.clone().addScaledVector(right, side).addScaledVector(d, -dist);
-    // keep the camera out of walls
-    const toCam = want.clone().sub(pivot);
-    const len = toCam.length();
-    toCam.divideScalar(len);
-    const hit = this.world.raycast(pivot, toCam, len, null, false);
-    if (hit && hit.t < len) want = pivot.clone().addScaledVector(toCam, Math.max(0.3, hit.t - 0.25));
-    const gh = this.world.height(want.x, want.z) + 0.3;
-    if (want.y < gh) want.y = gh;
-    if (snap) this.camPos.copy(want);
-    else this.camPos.lerp(want, Math.min(1, dt * 18));
-    this.camera.position.copy(this.camPos);
+    const p = this.player, inp = this.input;
+    const scoped = this.isScoped(), binos = this.binos && p.alive;
+    // rifle sway when looking through the scope; holding breath (Shift) steadies it
+    let sx = 0, sy = 0;
+    if (scoped) {
+      this.swayT += dt;
+      const t = this.swayT;
+      const amp = (inp.sprint && this.breath > 0 ? 0.0006 : this.breath <= 0 ? 0.009 : 0.004)
+        * (p.stance === 'prone' ? 0.4 : p.stance === 'crouch' ? 0.7 : 1);
+      sx = amp * (Math.sin(t * 0.9) + 0.5 * Math.sin(t * 2.3));
+      sy = amp * (Math.cos(t * 1.1) + 0.5 * Math.sin(t * 1.7));
+    }
+    const yaw = this.yaw + sx, pitch = this.pitch + sy;
+    const d = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+    let fov;
+    if (scoped || binos) {
+      // look through the optic from the soldier's eye
+      const eye = p.pos.clone().add(new THREE.Vector3(0, p.eyeHeight + 0.05, 0)).addScaledVector(d, 0.35);
+      this.camPos.copy(eye);
+      this.camera.position.copy(eye);
+      this.camera.lookAt(eye.clone().add(d));
+      p.obj.visible = false;
+      fov = binos ? 7 : 11;
+    } else {
+      p.obj.visible = true;
+      const aim = inp.aim && p.alive;
+      const right = new THREE.Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
+      const pivot = p.pos.clone().add(new THREE.Vector3(0, p.alive ? p.eyeHeight + 0.23 : 0.8, 0));
+      const dist = aim ? 1.6 : p.stance === 'prone' ? 2.5 : 3.2;
+      const side = aim ? 0.6 : 0.85;
+      let want = pivot.clone().addScaledVector(right, side).addScaledVector(d, -dist);
+      // keep the camera out of walls
+      const toCam = want.clone().sub(pivot);
+      const len = toCam.length();
+      toCam.divideScalar(len);
+      const hit = this.world.raycast(pivot, toCam, len, null, false);
+      if (hit && hit.t < len) want = pivot.clone().addScaledVector(toCam, Math.max(0.3, hit.t - 0.25));
+      const gh = this.world.height(want.x, want.z) + 0.3;
+      if (want.y < gh) want.y = gh;
+      if (snap) this.camPos.copy(want);
+      else this.camPos.lerp(want, Math.min(1, dt * 18));
+      this.camera.position.copy(this.camPos);
+      this.camera.lookAt(this.camPos.clone().add(d));
+      fov = aim ? 48 : 70;
+    }
     if (this.fx.shake > 0) {
       const s = this.fx.shake * 0.15;
       this.camera.position.x += (Math.random() - 0.5) * s;
       this.camera.position.y += (Math.random() - 0.5) * s;
     }
-    this.camera.lookAt(this.camPos.clone().add(d));
-    const fov = aim ? 48 : 70;
-    this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 12 || 1);
+    this.camera.fov = scoped || binos ? fov : this.camera.fov + (fov - this.camera.fov) * Math.min(1, dt * 12 || 1);
     this.camera.updateProjectionMatrix();
     this.audio.setListener(p.pos, this.yaw);
   }
@@ -866,7 +1213,7 @@ class Game {
 
     // squad status
     const allies = this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup');
-    $('.squad').innerHTML = allies.map((a) => `${a.name} ${a.hp < 60 ? '· wounded' : ''}`).join('<br>');
+    $('.squad').innerHTML = allies.map((a) => `${a.name}${a.role === 'marksman' ? ' (marksman)' : ''} · ${(a.order || 'follow').toUpperCase()}${a.hp < 60 ? ' · wounded' : ''}`).join('<br>');
 
     // waypoint
     const wp = this.objectiveWaypoint();
@@ -885,6 +1232,154 @@ class Game {
       $('.wp-dist').textContent = `${Math.round(wp.distanceTo(p.pos))} m`;
     }
     this.updateCompass(wp);
+    this.updateTacticalHUD();
+  }
+
+  // ------------------------------------------------------------ tactical HUD
+
+  updateTacticalHUD() {
+    const p = this.player, cam = this.camera;
+    const W = window.innerWidth, H = window.innerHeight;
+    const scoped = this.isScoped(), binos = this.binos && p.alive;
+    $('.ammo-name').textContent = this.W.name.toUpperCase();
+    $('.ammo-gren').textContent = `GRENADES ${this.grenades} (G)`;
+    $('.stance-ind').textContent = `${p.stance.toUpperCase()}${p.towerCenter ? ' · TOWER' : ''}${this.world.inBush(p.pos.x, p.pos.z) ? ' · IN COVER' : ''}`;
+    $('.scope').classList.toggle('on', scoped);
+    $('.binos').classList.toggle('on', binos);
+    $('.crosshair').style.display = scoped || binos ? 'none' : '';
+    $('.breath div').style.width = `${this.breath * 100}%`;
+    if (binos) {
+      const d = new THREE.Vector3();
+      cam.getWorldDirection(d);
+      const hit = this.world.raycast(cam.position, d, 600, p);
+      $('.binos-range').textContent = `RANGE ${hit ? Math.round(hit.t) : '---'} m`;
+    }
+
+    // stealth status
+    const lt = this.units.filter((u) => u.team === 'ltte' && u.alive);
+    const alarm = this.world.alarms.some((a) => a.triggered && !a.disabled);
+    const spotted = lt.some((u) => (u.state === 'combat' || u.state === 'alarm') && u.pos.distanceTo(p.pos) < 90);
+    const sus = lt.some((u) => u.state === 'suspicious' || u.state === 'search' || u.detect > 0.3);
+    const st = $('.stealth');
+    st.textContent = alarm ? 'ALARM' : spotted ? 'SPOTTED' : sus ? 'SUSPICIOUS' : 'HIDDEN';
+    st.dataset.level = alarm || spotted ? 'red' : sus ? 'amber' : 'green';
+    $('.alarm-banner').classList.toggle('on', alarm);
+
+    // detection arcs around the crosshair
+    const yawDeg = THREE.MathUtils.radToDeg(Math.atan2(Math.sin(this.yaw), Math.cos(this.yaw)));
+    const arcs = lt.filter((u) => (u.detect > 0.05 || u.state === 'combat' || u.state === 'alarm') && u.pos.distanceTo(p.pos) < 100);
+    const box = $('.detect');
+    while (box.children.length < arcs.length) box.appendChild(document.createElement('i'));
+    [...box.children].forEach((el, i) => {
+      const u = arcs[i];
+      if (!u) { el.style.display = 'none'; return; }
+      const ang = THREE.MathUtils.radToDeg(Math.atan2(u.pos.x - p.pos.x, u.pos.z - p.pos.z)) - yawDeg;
+      const k = u.state === 'combat' || u.state === 'alarm' ? 1 : u.detect;
+      el.style.display = '';
+      el.style.width = `${16 + 30 * k}px`;
+      el.style.background = k >= 1 ? '#e0573a' : k > 0.3 ? '#e8a23a' : '#e8d86a';
+      el.style.transform = `translate(-50%, -50%) rotate(${-ang}deg) translateY(-96px)`;
+    });
+
+    // markers over marked hostiles
+    const marked = lt.filter((u) => u.marked);
+    const mk = $('.markers');
+    while (mk.children.length < marked.length) mk.appendChild(document.createElement('i'));
+    const v = new THREE.Vector3();
+    [...mk.children].forEach((el, i) => {
+      const u = marked[i];
+      if (!u) { el.style.display = 'none'; return; }
+      v.set(u.pos.x, u.pos.y + u.bodyHeight + 0.7, u.pos.z).project(cam);
+      if (v.z > 1) { el.style.display = 'none'; return; }
+      el.style.display = '';
+      el.style.left = `${(v.x * 0.5 + 0.5) * W}px`;
+      el.style.top = `${(-v.y * 0.5 + 0.5) * H}px`;
+      el.className = u.state === 'alarm' ? 'runner' : '';
+    });
+
+    // squad orders
+    const o = this.squadOrders;
+    $('.orders').textContent = `SQUAD ${o.mode.toUpperCase()} · BRAVO ${o.bravo === 'move' ? 'POSITIONED' : 'WITH YOU'} · WEAPONS ${o.fire.toUpperCase()}`;
+  }
+
+  // ------------------------------------------------------------ tactical map
+
+  toggleMap(force) {
+    this.mapOpen = force ?? !this.mapOpen;
+    $('#map').classList.toggle('hidden', !this.mapOpen);
+    if (this.mapOpen) this.drawMap();
+  }
+
+  buildMapBase() {
+    const S = this.world.size, N = 360;
+    const c = document.createElement('canvas');
+    c.width = c.height = N;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(N, N);
+    const ground = this.mission.world.ground.map((h) => new THREE.Color(h));
+    for (let j = 0; j < N; j++) {
+      for (let i = 0; i < N; i++) {
+        const x = (i / N) * 2 * S - S, z = (j / N) * 2 * S - S;
+        const h = this.world.height(x, z);
+        let col;
+        if (this.world.water !== null && h < this.world.water) col = [40, 78, 88];
+        else {
+          const g = ground[0].clone().lerp(ground[1], 0.5).multiplyScalar(0.55 + Math.min(0.45, Math.max(0, h) * 0.06));
+          col = [g.r * 255, g.g * 255, g.b * 255];
+        }
+        const k = (j * N + i) * 4;
+        img.data.set([col[0], col[1], col[2], 255], k);
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const toMap = (x, z) => [((x + S) / (2 * S)) * N, ((z + S) / (2 * S)) * N];
+    for (const [type, list] of Object.entries(this.world.placements)) {
+      for (const pl of list) {
+        const [mx, my] = toMap(pl.x, pl.z);
+        if (/house|bunker|bund|tower|gate|buffel|supplies|sandbag|rock_outcrop/.test(type)) {
+          ctx.fillStyle = type.includes('bund') ? '#6e4a2c' : '#2a2620';
+          const r = type === 'earth_bund' ? 7 : type === 'rock_outcrop' ? 14 : 2.5;
+          ctx.fillRect(mx - r, my - (type === 'earth_bund' ? 2 : r), r * 2, type === 'earth_bund' ? 4 : r * 2);
+        } else if (type !== 'bush') {
+          ctx.fillStyle = 'rgba(12,28,8,0.8)';
+          ctx.beginPath(); ctx.arc(mx, my, 2.2, 0, 6.28); ctx.fill();
+        }
+      }
+    }
+    this.mapBase = c;
+  }
+
+  drawMap() {
+    if (!this.mapBase) this.buildMapBase();
+    const cv = $('#map canvas'), ctx = cv.getContext('2d');
+    const N = Math.min(window.innerWidth - 32, window.innerHeight - 140, 720);
+    if (cv.width !== N) { cv.width = cv.height = N; }
+    ctx.drawImage(this.mapBase, 0, 0, N, N);
+    const S = this.world.size;
+    const toMap = (x, z) => [((x + S) / (2 * S)) * N, ((z + S) / (2 * S)) * N];
+    const dot = (x, z, color, r = 4) => { const [a, b] = toMap(x, z); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(a, b, r, 0, 6.28); ctx.fill(); };
+    const glyph = (x, z, g, color, size = 16) => { const [a, b] = toMap(x, z); ctx.fillStyle = color; ctx.font = `${size}px Oswald, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(g, a, b); };
+    for (const s of this.world.supplies) glyph(s.x, s.z, '✚', '#9bd16a', 14);
+    for (const t of this.world.towers) glyph(t.x, t.z, '▲', '#b9b39c', 13);
+    for (const a of this.world.alarms) glyph(a.x, a.z, '⚑', a.disabled ? '#777' : '#e0573a', 18);
+    const o = this.currentObjective();
+    if (o?.type === 'escort') { const [a, b] = toMap(o.zone[0], o.zone[1]); ctx.strokeStyle = '#e0b84a'; ctx.beginPath(); ctx.arc(a, b, (o.zone[2] / (2 * S)) * N, 0, 6.28); ctx.stroke(); }
+    for (const u of this.units) {
+      if (!u.alive || u.isPlayer) continue;
+      if (u.team === 'army') dot(u.pos.x, u.pos.z, '#9bd16a', 4);
+      else if (u.team === 'civ') dot(u.pos.x, u.pos.z, '#7fc8e8', 3);
+      else if (u.marked) glyph(u.pos.x, u.pos.z, '◆', '#e0573a', 14);
+    }
+    const wp = this.objectiveWaypoint();
+    if (wp) glyph(wp.x, wp.z, '◇', '#e0b84a', 22);
+    const [px, py] = toMap(this.player.pos.x, this.player.pos.z);
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(-this.yaw + Math.PI);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    $('.map-info').innerHTML = `<b>${this.mission.name.toUpperCase()}</b> · ${o ? o.text : ''}<br><span>▲ you · ● squad · ◆ marked hostile · ⚑ alarm · ▲ tower · ✚ supplies · ◇ objective · N is up · M to close</span>`;
   }
 
   updateCompass(wp) {
@@ -950,8 +1445,23 @@ class Game {
     if (this.state === 'playing') {
       this.time += dt;
       this.missionTime += dt;
+      if (this.insertion) {
+        if (this.input.hit('Space') || this.input.hit('Enter') || this.input.hit('Escape')) this.skipInsertion();
+        else {
+          this.insertion.update(dt);
+          for (const u of this.units) u.sync(dt);
+          if (this.insertion.done) { this.insertion = null; this.startOperations(); }
+        }
+        this.radio.update(dt);
+        this.fx.update(dt);
+        this.world.followSun(this.player.pos);
+        this.input.endFrame();
+        return;
+      }
       if (this.input.hit('Escape') || this.input.hit('KeyP')) this.pause();
+      if (this.input.hit('KeyM')) this.toggleMap();
       this.updatePlayer(dt);
+      this.updateProjectiles(dt);
       for (const u of this.units) if (!u.isPlayer) u.update(dt);
       this.alertLevel = Math.max(0, this.alertLevel - dt);
       this.updateShelling(dt);
@@ -966,6 +1476,7 @@ class Game {
       }
       this.updateCamera(dt);
       this.updateHUD();
+      if (this.mapOpen) this.drawMap();
       this.fx.update(dt);
       // remove bodies that have sunk away
       for (let i = this.units.length - 1; i >= 0; i--) {

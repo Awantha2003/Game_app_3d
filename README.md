@@ -30,6 +30,18 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **Menus:** Continue Campaign, New Campaign, Mission Selection, Squad, Player Profile (with reset), Historical Archive (timeline, human cost, sources), Settings (sensitivity, volume, difficulty, graphics) and Credits. Loadout and multiplayer are shown as *planned* and disabled.
 - **Epilogue:** a historical timeline, the human cost on every side, where the fictional squad ended up, and a message of remembrance.
 
+## Tactical gameplay
+
+- **Stances:** C crouches, Z goes prone, Space stands up. Enemies see you more slowly when you crouch, go prone, keep still or hide in bushes.
+- **Stealth AI:** LTTE cadres patrol or guard their posts. Each one has a field of view and a detection meter, shown as arcs around your crosshair. When they notice something they become suspicious, then search, then fight. They also hear gunshots and running footsteps. A HUD tag shows HIDDEN, SUSPICIOUS, SPOTTED or ALARM.
+- **Alarms:** an alerted cadre runs for the camp siren. If he reaches it, reinforcements arrive. You can sabotage an alarm by holding E. Thoppigala has an alarm objective.
+- **Watchtowers:** sentries with long sightlines. You can climb a tower yourself with E.
+- **Weapons:** 1 is the T-56. 2 is a suppressed pistol, heard only about 9 m away. 3 is the SVD with a scope; it sways, and holding Shift holds your breath to steady it. G throws a grenade.
+- **Binoculars (B):** look at a hostile to mark him on the HUD and the map.
+- **Tactical map (M):** shows the terrain, buildings, towers, alarms, supplies, your squad and marked hostiles.
+- **Squad orders:** T makes the squad follow or hold. V sends Bravo team to the point you are aiming at, so the team can split and flank. X sets weapons free or tight. While weapons are tight, allies fire only once the enemy is alerted. They copy your stance so they don't give you away. Kasun is a marksman in a ghillie suit.
+- **Insertion scenes:** the squad arrives by Bell 212-style helicopter (Thoppigala, Elephant Pass), by Navy Arrow boat onto the Pooneryn beach, or by Buffel APC. You can skip them with Space.
+
 The full design and roadmap (new missions, squad orders, weapons, co-op with invite links) are in [`docs/GAME_PLAN.md`](docs/GAME_PLAN.md).
 
 ## Testing

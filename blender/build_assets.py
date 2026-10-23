@@ -335,10 +335,36 @@ def rifle(parent, at):
     return ob
 
 
-def soldier(name, cloth_tex, skin, faction):
+def tex_face_paint(skin):
+    """Skin with green and black camouflage cream stripes."""
+    out = np.zeros((TEX, TEX, 3))
+    out[:] = hex_rgb(skin)
+    n1 = fbm(TEX, TEX, 2, 6, 61)
+    n2 = fbm(TEX, TEX, 3, 8, 67)
+    out[n1 > 0.55] = hex_rgb("#2f4a22")
+    out[n2 > 0.62] = hex_rgb("#141510")
+    return make_image("tex_face_paint", out)
+
+
+def ghillie_strips(p, mats, centers, count, length, seed):
+    """Hang loose burlap strips around the given points (ghillie suit)."""
+    rnd = random.Random(seed)
+    for i in range(count):
+        cx, cy, cz, r = centers[i % len(centers)]
+        a = rnd.uniform(0, math.tau)
+        x, y = cx + math.cos(a) * r, cy + math.sin(a) * r
+        z = cz + rnd.uniform(-0.05, 0.05)
+        ln = rnd.uniform(length * 0.6, length)
+        p.box(mats[i % len(mats)], (rnd.uniform(0.02, 0.05), 0.012, ln), (x, y, z - ln / 2),
+              (rnd.uniform(-25, 25), rnd.uniform(-25, 25), math.degrees(a) + 90))
+
+
+def soldier(name, cloth_tex, skin, faction, hat=None, paint=False, ghillie=False, weapon="t56"):
     reset()
     cloth = mat("uniform", "#ffffff", 0.95, image=cloth_tex())
     skin_m = mat("skin", skin, 0.7)
+    face_m = mat("face_paint", "#ffffff", 0.75, image=tex_face_paint(skin)) if paint else skin_m
+    burlap = [mat("ghillie_tan", "#8c7a52", 1.0), mat("ghillie_green", "#4f5a2c", 1.0), mat("ghillie_brown", "#5a4630", 1.0)]
     boot = mat("boot", "#1b1712", 0.6)
     gear = mat("webbing", "#3d4128" if faction == "army" else "#2b2a1f", 0.9)
     hair = mat("hair", "#0f0d0b", 0.9)
@@ -370,12 +396,24 @@ def soldier(name, cloth_tex, skin, faction):
         torso.box(gear, (0.05, 0.25, 0.5), (0.12, 0, 0.3), (0, 0, -20))
         torso.box(gear, (0.05, 0.25, 0.5), (-0.12, 0, 0.3), (0, 0, 20))
     torso.cyl(skin_m, 0.055, 0.1, (0, 0, 0.56), seg=8)
+    if ghillie:
+        ghillie_strips(torso, burlap, [(0, 0.05, 0.52, 0.2), (0.18, 0.08, 0.45, 0.08), (-0.18, 0.08, 0.45, 0.08),
+                                       (0, 0.18, 0.4, 0.15)], 70, 0.45, 5)
+    else:
+        # bandolier across the chest
+        torso.box(gear, (0.06, 0.3, 0.62), (0, -0.02, 0.3), (0, 0, 0), )
     t = torso.finish(root, (0, 0, 1.0))
 
     head = Part("Head")
-    head.sphere(skin_m, 0.115, (0, 0, 0.11), (0.9, 1.0, 1.08))
-    head.box(skin_m, (0.04, 0.05, 0.04), (0, -0.115, 0.1))
-    if faction == "army":
+    head.sphere(face_m, 0.115, (0, 0, 0.11), (0.9, 1.0, 1.08))
+    head.box(face_m, (0.04, 0.05, 0.04), (0, -0.115, 0.1))
+    if hat == "boonie":
+        head.cyl(cloth, 0.2, 0.02, (0, 0, 0.17), seg=16)
+        head.cyl(cloth, 0.125, 0.11, (0, 0, 0.23), seg=12, r2=0.11)
+        head.cyl(gear, 0.127, 0.025, (0, 0, 0.19), seg=12)
+        if ghillie:
+            ghillie_strips(head, burlap, [(0, 0, 0.26, 0.12), (0, 0.04, 0.2, 0.19)], 46, 0.32, 9)
+    elif faction == "army":
         helmet = mat("helmet", "#3f4a26", 0.8)
         head.sphere(helmet, 0.145, (0, 0, 0.15), (1.0, 1.05, 0.75), seg=12)
         head.cyl(helmet, 0.16, 0.02, (0, 0, 0.1), seg=12)
@@ -400,7 +438,13 @@ def soldier(name, cloth_tex, skin, faction):
     arm_l.sphere(skin_m, 0.05, (0, -0.42, -0.28), seg=8)
     arm_l.finish(t, (0.25, 0, 0.46), (0, 0, -32))
 
-    rifle(t, (-0.1, -0.24, 0.2))
+    if weapon == "svd":
+        p = Part("Rifle", 4.0)
+        muzzle, _, _ = build_svd(p)
+        ob = p.finish(t, (-0.1, -0.2, 0.18))
+        empty("Muzzle", ob, muzzle)
+    else:
+        rifle(t, (-0.1, -0.24, 0.2))
     save(name)
 
 
@@ -843,6 +887,72 @@ def build_svd(p):
     return (0, -0.9, 0.045), (0, 0.0, 0.135), ((0, 0.06, -0.06), (0, -0.36, -0.005))
 
 
+def weapon_model(name, build):
+    """Weapon on its own (third-person), origin at the grip, with a Muzzle empty."""
+    reset()
+    p = Part("Weapon", 4.0)
+    muzzle, _, _ = build(p)
+    ob = p.finish(empty(name))
+    empty("Muzzle", ob, muzzle)
+    save(name)
+
+
+def helicopter():
+    """Bell 212-style utility helicopter in air force olive camouflage."""
+    reset()
+    camo_m = mat("heli_camo", "#ffffff", 0.7, image=tex_vehicle())
+    dark = mat("heli_dark", "#1c1f1a", 0.5, 0.4)
+    glass = mat("heli_glass", "#24343c", 0.1, 0.5)
+    metal = mat("heli_metal", "#3a3d38", 0.4, 0.7)
+    root = empty("Helicopter")
+    body = Part("Body", 0.35)
+    body.box(camo_m, (2.3, 4.2, 2.0), (0, 0, 1.6))
+    body.prism(camo_m, 1.6, 2.3, 1.2, 1.8, (0, -2.85, 0.7), (6, 0, 0))
+    body.box(glass, (2.0, 1.2, 0.9), (0, -2.9, 2.0), (-20, 0, 0))
+    body.box(dark, (0.05, 1.8, 1.3), (1.16, -0.2, 1.5))
+    body.box(dark, (0.05, 1.8, 1.3), (-1.16, -0.2, 1.5))
+    body.box(camo_m, (1.4, 2.0, 0.6), (0, 0.6, 2.85))
+    body.cyl(camo_m, 0.45, 6.5, (0, 5.2, 2.2), (90, 0, 0), seg=10, r2=0.22)
+    body.box(camo_m, (0.12, 1.2, 1.6), (0, 8.2, 2.9), (-25, 0, 0))
+    body.box(camo_m, (1.8, 0.5, 0.08), (0, 6.8, 2.2))
+    for x in (-1.1, 1.1):
+        body.cyl(metal, 0.06, 4.6, (x, -0.3, 0.12), (90, 0, 0), seg=6)
+        for y in (-1.3, 0.9):
+            body.cyl(metal, 0.05, 0.7, (x * 0.85, y, 0.45), (0, x * 18, 0), seg=6)
+    body.cyl(metal, 0.12, 0.6, (0, 0.2, 3.35), seg=8)
+    body.finish(root)
+    rotor = Part("Rotor", 1.0)
+    rotor.cyl(metal, 0.25, 0.2, (0, 0, 0), seg=8)
+    for a in (0, 90):
+        rotor.box(dark, (0.4, 14.0, 0.05), (0, 0, 0.05), (0, 0, a))
+    rotor.finish(root, (0, 0.2, 3.7))
+    tail = Part("TailRotor", 1.0)
+    tail.box(dark, (0.04, 0.22, 2.4), (0, 0, 0))
+    tail.box(dark, (0.04, 2.4, 0.22), (0, 0, 0))
+    tail.finish(root, (0.2, 8.6, 3.2))
+    save("helicopter")
+
+
+def arrow_boat():
+    """Navy 'Arrow' fast inshore boat with twin outboards and a bow gun."""
+    reset()
+    hull = mat("arrow_hull", "#5d6b73", 0.45)
+    deck = mat("arrow_deck", "#3a4247", 0.7)
+    eng = mat("arrow_engine", "#141414", 0.4, 0.5)
+    p = Part("Boat", 0.4)
+    p.prism(hull, 5.4, 0.5, 2.2, 0.8, (0, 0.4, 0))
+    p.prism(hull, 1.8, 0.2, 2.2, 0.8, (0, -3.0, 0.1), (8, 0, 0))
+    p.box(deck, (2.0, 5.2, 0.06), (0, 0.4, 0.82))
+    p.box(deck, (1.0, 0.6, 0.6), (0, 0.2, 1.15))
+    p.cyl(eng, 0.03, 0.9, (0, -2.4, 1.3), (90, 0, 0), seg=6)
+    p.box(eng, (0.2, 0.35, 0.3), (0, -1.9, 1.15))
+    for x in (-0.45, 0.45):
+        p.box(eng, (0.35, 0.45, 0.6), (x, 3.25, 0.95))
+        p.box(eng, (0.12, 0.15, 0.7), (x, 3.35, 0.3))
+    p.finish()
+    save("arrow_boat")
+
+
 def grenade():
     reset()
     body = mat("grenade_body", "#3b4a2c", 0.6, 0.2)
@@ -964,6 +1074,11 @@ def save_png(name, arr, alpha=False):
 BUILDERS = [
     lambda: soldier("soldier_army", tex_army_dpm, "#6e4a30", "army"),
     lambda: soldier("soldier_ltte", tex_tiger_stripe, "#5e3e28", "ltte"),
+    lambda: soldier("soldier_sf", tex_army_dpm, "#6e4a30", "army", hat="boonie", paint=True),
+    lambda: soldier("soldier_ghillie", tex_army_dpm, "#6a4630", "army", hat="boonie", paint=True, ghillie=True, weapon="svd"),
+    lambda: weapon_model("wpn_svd", build_svd),
+    lambda: weapon_model("wpn_pistol", build_pistol),
+    helicopter, arrow_boat,
     civilian, buffel, sea_tiger_boat, bunker, earth_bund,
     lambda: house(False), lambda: house(True),
     water_tower, sluice_gate, coconut_palm, palmyrah_palm, jungle_tree, bush,

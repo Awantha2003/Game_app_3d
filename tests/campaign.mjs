@@ -57,11 +57,14 @@ try {
       g.openBriefing(mi);
       const fiction = document.querySelector('.b-fiction').textContent.length > 0;
       g.beginMission();
+      const inserted = !!g.insertion;
+      for (let k = 0; k < 60 && g.insertion; k++) g.update(1 / 30); // watch the start of the insertion
+      g.skipInsertion();
       const T = g.player.pos.constructor;
       let lastPos = null, stuck = 0, side = 'KeyA';
       for (let step = 0; step < 30 * 600 && g.state === 'playing'; step++) {
         const pl = g.player;
-        pl.hp = Math.max(pl.hp, 60); // the bot tests progression, not survival
+        pl.hp = 100; // the bot tests progression, not survival
         const inp = g.input;
         inp.keys.clear(); inp.fire = false; inp.touchAction = false;
         const vis = g.units.filter((u) => u.alive && u.team === 'ltte' && u.pos.distanceTo(pl.pos) < 70
@@ -101,7 +104,8 @@ try {
         g.update(1 / 30);
       }
       const out = {
-        state: g.state, time: Math.round(g.missionTime), fiction,
+        state: g.state, time: Math.round(g.missionTime), fiction, inserted, insertion: g.mission.insertion,
+        marked: g.units.filter((u) => u.marked).length, alarms: g.world.alarms.map((a) => (a.triggered ? 'T' : a.disabled ? 'D' : '-')).join(''),
         xp: document.querySelector('.xp-box')?.textContent || '',
         fail: document.querySelector('.f-title').textContent,
         totalXP: g.profile.xp, rank: g.profile.rank.id,
@@ -110,6 +114,7 @@ try {
       return out;
     }, i);
     check(r.fiction, `mission ${i + 1}: briefing shows the fiction block`);
+    check(!r.insertion || r.inserted, `mission ${i + 1}: ${r.insertion || 'no'} insertion played (alarms ${r.alarms || 'none'})`);
     check(r.state === 'complete', `mission ${i + 1}: completed in ${r.time}s game time${r.fail ? ` (failed: ${r.fail})` : ''}`);
     check(/Mission XP/.test(r.xp), `mission ${i + 1}: debrief shows XP (${r.totalXP} total, rank ${r.rank})`);
     if (r.state !== 'complete') continue;

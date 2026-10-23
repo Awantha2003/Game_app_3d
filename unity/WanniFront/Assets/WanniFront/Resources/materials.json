@@ -12,6 +12,24 @@
    "metallic": 0.0,
    "texture": null
   },
+  "ghillie_tan": {
+   "color": "#8c7a52",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_green": {
+   "color": "#4f5a2c",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_brown": {
+   "color": "#5a4630",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
   "boot": {
    "color": "#1b1712",
    "roughness": 0.6,
@@ -62,6 +80,24 @@
    "metallic": 0.0,
    "texture": null
   },
+  "ghillie_tan": {
+   "color": "#8c7a52",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_green": {
+   "color": "#4f5a2c",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_brown": {
+   "color": "#5a4630",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
   "boot": {
    "color": "#1b1712",
    "roughness": 0.6,
@@ -96,6 +132,240 @@
    "color": "#6b3d1f",
    "roughness": 0.6,
    "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "soldier_sf": {
+  "uniform": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6e4a30",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "face_paint": {
+   "color": "#ffffff",
+   "roughness": 0.75,
+   "metallic": 0.0,
+   "texture": "tex_face_paint"
+  },
+  "ghillie_tan": {
+   "color": "#8c7a52",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_green": {
+   "color": "#4f5a2c",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_brown": {
+   "color": "#5a4630",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "boot": {
+   "color": "#1b1712",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "webbing": {
+   "color": "#3d4128",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "hair": {
+   "color": "#0f0d0b",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "gun_metal": {
+   "color": "#25272a",
+   "roughness": 0.45,
+   "metallic": 0.8,
+   "texture": null
+  },
+  "gun_wood": {
+   "color": "#6b3d1f",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "soldier_ghillie": {
+  "uniform": {
+   "color": "#ffffff",
+   "roughness": 0.95,
+   "metallic": 0.0,
+   "texture": "tex_army_dpm"
+  },
+  "skin": {
+   "color": "#6a4630",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "face_paint": {
+   "color": "#ffffff",
+   "roughness": 0.75,
+   "metallic": 0.0,
+   "texture": "tex_face_paint"
+  },
+  "ghillie_tan": {
+   "color": "#8c7a52",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_green": {
+   "color": "#4f5a2c",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "ghillie_brown": {
+   "color": "#5a4630",
+   "roughness": 1.0,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "boot": {
+   "color": "#1b1712",
+   "roughness": 0.6,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "webbing": {
+   "color": "#3d4128",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "hair": {
+   "color": "#0f0d0b",
+   "roughness": 0.9,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "svd_metal": {
+   "color": "#26282b",
+   "roughness": 0.4,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "svd_wood": {
+   "color": "#6e3b1c",
+   "roughness": 0.55,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "scope": {
+   "color": "#141516",
+   "roughness": 0.3,
+   "metallic": 0.6,
+   "texture": null
+  },
+  "scope_glass": {
+   "color": "#2b4a5c",
+   "roughness": 0.05,
+   "metallic": 0.4,
+   "texture": null
+  }
+ },
+ "wpn_svd": {
+  "svd_metal": {
+   "color": "#26282b",
+   "roughness": 0.4,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "svd_wood": {
+   "color": "#6e3b1c",
+   "roughness": 0.55,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "scope": {
+   "color": "#141516",
+   "roughness": 0.3,
+   "metallic": 0.6,
+   "texture": null
+  },
+  "scope_glass": {
+   "color": "#2b4a5c",
+   "roughness": 0.05,
+   "metallic": 0.4,
+   "texture": null
+  }
+ },
+ "wpn_pistol": {
+  "pistol_metal": {
+   "color": "#1d1f22",
+   "roughness": 0.35,
+   "metallic": 0.85,
+   "texture": null
+  },
+  "pistol_grip": {
+   "color": "#2a2420",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  }
+ },
+ "helicopter": {
+  "heli_camo": {
+   "color": "#ffffff",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": "tex_vehicle_camo"
+  },
+  "heli_dark": {
+   "color": "#1c1f1a",
+   "roughness": 0.5,
+   "metallic": 0.4,
+   "texture": null
+  },
+  "heli_glass": {
+   "color": "#24343c",
+   "roughness": 0.1,
+   "metallic": 0.5,
+   "texture": null
+  },
+  "heli_metal": {
+   "color": "#3a3d38",
+   "roughness": 0.4,
+   "metallic": 0.7,
+   "texture": null
+  }
+ },
+ "arrow_boat": {
+  "arrow_hull": {
+   "color": "#5d6b73",
+   "roughness": 0.45,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "arrow_deck": {
+   "color": "#3a4247",
+   "roughness": 0.7,
+   "metallic": 0.0,
+   "texture": null
+  },
+  "arrow_engine": {
+   "color": "#141414",
+   "roughness": 0.4,
+   "metallic": 0.5,
    "texture": null
   }
  },

@@ -81,6 +81,34 @@ export class Audio {
     else this.burst({ pos, dur: 0.22, freq: 1800, vol: 0.7, thump: 110 });
   }
 
+  // gunshot by weapon type; pos = null for the player's own weapon
+  weapon(kind, pos = null) {
+    if (kind === 'pistol') this.burst({ pos, dur: 0.07, freq: 900, q: 1.2, vol: 0.35, thump: 120 });
+    else if (kind === 'svd') this.burst({ pos, dur: 0.5, freq: 2200, vol: pos ? 0.9 : 0.75, thump: 75 });
+    else this.shot(pos, !pos);
+  }
+
+  // rising and falling camp siren
+  siren(on) {
+    if (!this.ctx) return;
+    if (on && !this.sirenOsc) {
+      const o = this.ctx.createOscillator(), lfo = this.ctx.createOscillator(), depth = this.ctx.createGain(), g = this.ctx.createGain();
+      o.type = 'sawtooth';
+      o.frequency.value = 700;
+      lfo.frequency.value = 0.45;
+      depth.gain.value = 260;
+      lfo.connect(depth).connect(o.frequency);
+      g.gain.value = 0.05;
+      o.connect(g).connect(this.master);
+      o.start();
+      lfo.start();
+      this.sirenOsc = [o, lfo];
+    } else if (!on && this.sirenOsc) {
+      for (const n of this.sirenOsc) n.stop();
+      this.sirenOsc = null;
+    }
+  }
+
   explosion(pos) {
     this.burst({ pos, dur: 1.8, freq: 380, vol: 2.2, thump: 60, attack: 0.005 });
   }
