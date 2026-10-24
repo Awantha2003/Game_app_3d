@@ -44,6 +44,13 @@
     <div class="alarm-banner">⚠ ALARM ⚠</div>
     <div class="insert-skip">Press Space to skip</div>
     <div class="rotate-hint">Turn your phone sideways for a wider view</div>
+    <div class="nametags"></div>
+    <div class="voice"></div>
+    <div class="chat-log"></div>
+    <div class="chat-box hidden">
+      <div class="chat-row"><input maxlength="120" placeholder="Message your team… (Enter)" /><button class="btn small chat-send">Send</button><button class="btn small chat-close">✕</button></div>
+      <div class="chat-quick"><button class="btn small" data-quick="Follow me">Follow me</button><button class="btn small" data-quick="Wait here">Wait here</button><button class="btn small" data-quick="Enemy spotted!">Enemy spotted!</button><button class="btn small" data-quick="Need help!">Need help!</button><button class="btn small" data-quick="Cover me">Cover me</button><button class="btn small" data-quick="Good work">Good work</button><button class="btn small" data-quick="Moving out">Moving out</button></div>
+    </div>
     <div class="scope">
       <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
         <defs><mask id="scope-mask"><rect x="-200" y="-200" width="560" height="490" fill="white" /><circle cx="80" cy="45" r="40" fill="black" /></mask></defs>
@@ -92,6 +99,8 @@
       <button class="tbtn tsm" data-key="KeyT">SQUAD</button>
       <button class="tbtn tsm" data-key="KeyH">MEDIC</button>
       <button class="tbtn tsm" data-key="KeyN">NV</button>
+      <button class="tbtn tsm coop-only btn-chat">CHAT</button>
+      <button class="tbtn tsm coop-only btn-mic">MIC</button>
     </div>
   </div>
 
@@ -129,7 +138,7 @@
           <button class="mbtn" data-act="settings"><span>Settings</span><small>Controls, sound, graphics</small></button>
           <button class="mbtn" data-act="credits"><span>Credits</span></button>
           <button class="mbtn" data-act="loadout"><span>Loadout</span><small>Weapons and equipment unlocked by rank</small></button>
-          <button class="mbtn" data-act="coop"><span>Co-op (2 players)</span><small>Play a mission with a friend over an invite link</small></button>
+          <button class="mbtn" data-act="coop"><span>Co-op (up to 4)</span><small>Share a link, play with friends, talk on voice chat</small></button>
         </div>
         <div class="menu-side">
           <div class="rank-card"></div>
@@ -192,7 +201,7 @@
         </label>
       </div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves)
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
       </div>
       <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn" data-act="prologue">Watch prologue</button></div>
     </div>
@@ -205,11 +214,32 @@
     </div>
 
     <div class="panel wide hidden" data-screen="coop">
-      <div class="eyebrow">Co-op · 2 players</div>
+      <div class="eyebrow">Co-op · up to 4 players</div>
       <h2>Fight side by side</h2>
-      <p class="note">One player hosts and sends the invite link. The host's game runs the mission; both players earn XP. Works browser to browser (WebRTC) — some strict networks may block it.</p>
+      <p class="note">Up to 4 players. One player hosts and shares the invite link; friends open it, type their name and wait for the host to start. Everyone earns XP. Talk with the 🎤 mic or the chat. Works browser to browser (WebRTC) — some strict networks may block it. Keep the host's page open.</p>
+      <label class="coop-name-row">Your name <input class="coop-name" maxlength="16" placeholder="e.g. Awantha" /></label>
+      <label class="coop-via-row">Connection
+        <select class="coop-via">
+          <option value="n">Server 1 — many relays (recommended)</option>
+          <option value="p">Server 2 — PeerJS (try if Server 1 fails)</option>
+        </select>
+      </label>
       <div class="coop-status"></div>
-      <div class="coop-invite hidden"><input class="coop-link" readonly /><button class="btn" data-act="coop-copy">Copy link</button></div>
+      <div class="coop-invite hidden">
+        <input class="coop-link" readonly />
+        <div class="coop-share-row">
+          <button class="btn primary" data-act="coop-share">Share invite</button>
+          <button class="btn" data-act="coop-whatsapp">WhatsApp</button>
+          <button class="btn" data-act="coop-copy">Copy link</button>
+        </div>
+      </div>
+      <div class="coop-players"></div>
+      <div class="coop-social hidden">
+        <button class="btn" data-act="coop-mic">🎤 Turn on mic (voice chat)</button>
+        <div class="coop-chat-log"></div>
+        <div class="coop-chat-row"><input class="coop-chat-input" maxlength="120" placeholder="Say something to your team…" /><button class="btn" data-act="chat-send">Send</button></div>
+        <div class="coop-quick"><button class="btn small" data-quick="Follow me">Follow me</button><button class="btn small" data-quick="Wait here">Wait here</button><button class="btn small" data-quick="Enemy spotted!">Enemy spotted!</button><button class="btn small" data-quick="Need help!">Need help!</button><button class="btn small" data-quick="Cover me">Cover me</button><button class="btn small" data-quick="Good work">Good work</button><button class="btn small" data-quick="Moving out">Moving out</button></div>
+      </div>
       <div class="coop-host-controls hidden">
         <label>Mission <select class="coop-mission"></select></label>
         <button class="btn primary" data-act="coop-start">Start mission</button>
@@ -223,7 +253,7 @@
       <div class="credits-body">
         <p><b>Created by</b> Awantha — idea, story direction and design.</p>
         <p><b>Code, Blender models, sound and writing</b> built with Claude (Anthropic).</p>
-        <p><b>Engine</b> three.js (MIT) · Vite (MIT) · PeerJS for co-op (MIT).</p>
+        <p><b>Engine</b> three.js (MIT) · Vite (MIT) · Trystero and PeerJS for co-op (MIT).</p>
         <p><b>Fonts</b> Oswald, Inter, Noto Sans Sinhala (Google Fonts, SIL Open Font License).</p>
         <p>All 3D models are generated in Blender by <code>blender/build_assets.py</code>. All sounds are synthesised in the browser. No assets from commercial games are used.</p>
         <p>Characters and dialogue are fictional. Historical text is based on the sources in the Historical Archive.</p>
@@ -256,7 +286,7 @@
       <h2>Paused</h2>
       <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves)
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
       </div>
     </div>
 

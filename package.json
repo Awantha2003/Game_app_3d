@@ -19,8 +19,10 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@trystero-p2p/ws-relay": "^0.26.0",
     "peerjs": "^1.5.4",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "trystero": "^0.26.0"
   },
   "devDependencies": {
     "peer": "^1.0.2",

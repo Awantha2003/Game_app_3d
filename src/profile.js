@@ -18,6 +18,7 @@ function defaults() {
     seenPrologue: false,
     campaignComplete: false,
     loadout: { primary: 't56', gear: 'grenades', optics: 'none' },
+    name: '',
     settings: { ...DEFAULT_SETTINGS },
   };
 }
@@ -39,6 +40,7 @@ function validate(raw, missionIds) {
   }
   p.medals = Array.isArray(raw.medals) ? raw.medals.filter((m) => m in MEDALS) : [];
   p.seenPrologue = raw.seenPrologue === true;
+  p.name = typeof raw.name === 'string' ? raw.name.replace(/[<>&"'`]/g, '').trim().slice(0, 16) : '';
   const lo = raw.loadout || {};
   for (const slot of Object.keys(LOADOUT)) {
     if (LOADOUT[slot].some((o) => o.id === lo[slot])) p.loadout[slot] = lo[slot];
@@ -88,6 +90,16 @@ export class Profile {
 
   get rank() {
     return rankFor(this.xp);
+  }
+
+  // the name shown to friends in co-op
+  get name() {
+    return this.data.name || `${this.rank.short} Awan`;
+  }
+
+  setName(n) {
+    this.data.name = String(n ?? '').replace(/[<>&"'`]/g, '').replace(/\s+/g, ' ').trim().slice(0, 16);
+    this.save();
   }
 
   get settings() {

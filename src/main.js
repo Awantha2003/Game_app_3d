@@ -7,7 +7,7 @@ import { Input } from './input.js';
 import { MISSIONS } from './missions.js';
 import { Prologue } from './cinematic.js';
 import { Insertion } from './insertion.js';
-import { Net } from './net.js';
+import { MAX_PLAYERS, Net, cleanName } from './net.js';
 import { PostFX } from './postfx.js';
 import { Weather } from './weather.js';
 import { Profile } from './profile.js';
@@ -47,6 +47,9 @@ class Game {
     this.net.onStatus = (t) => { const el = $('.coop-status'); if (el) el.textContent = t; };
     this.net.onInvite = (link) => { $('.coop-link').value = link; $('.coop-invite').classList.remove('hidden'); };
     this.net.onConnect = () => this.refreshCoop();
+    this.net.onRoster = () => this.refreshCoop();
+    this.partners = new Map();
+    this.chatLog = [];
     this.audio = new Audio();
     this.fx = new FX(this.scene);
     this.input = new Input(this.canvas, $('#touch'));
@@ -163,10 +166,15 @@ class Game {
         settings: () => this.showSettings(),
         loadout: () => this.showLoadout('menu'),
         coop: () => this.showCoop(),
-        'coop-host': () => { this.net.host(); this.refreshCoop(); },
+        'coop-host': () => { this.saveCoopName(); this.net.host($('.coop-via').value); this.refreshCoop(); },
         'coop-copy': () => { navigator.clipboard?.writeText($('.coop-link').value).then(() => this.toast('Invite link copied'), () => {}); $('.coop-link').select(); },
+        'coop-share': () => this.shareInvite(),
+        'coop-whatsapp': () => window.open(`https://wa.me/?text=${encodeURIComponent(this.inviteText())}`, '_blank', 'noopener'),
+        'coop-mic': () => this.net.setMic(!this.net.micOn),
+        'chat-send': () => this.sendChatFrom($('.coop-chat-input')),
         'coop-start': () => this.coopHostStart(parseInt($('.coop-mission').value, 10)),
         'coop-leave': () => { this.net.leave(); this.net.setStatus('Not connected.'); $('.coop-invite').classList.add('hidden'); this.refreshCoop(); },
+        'quick-chat': () => {},
         'loadout-brief': () => this.showLoadout('briefing'),
         'loadout-back': () => (this.loadoutBack === 'briefing' ? this.openBriefing(this.missionIndex) : this.showMenu()),
         credits: () => this.show('credits'),
@@ -180,6 +188,25 @@ class Game {
       actions[act]?.();
     });
     $('#map canvas').addEventListener('click', (e) => this.mapOrder(e));
+    // chat: Enter sends, Escape closes; quick messages for phones
+    const chatInput = $('.chat-box input');
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { this.sendChatFrom(chatInput); this.closeChat(); }
+      if (e.key === 'Escape') this.closeChat();
+      e.stopPropagation();
+    });
+    $('.chat-box').addEventListener('click', (e) => {
+      const q = e.target.closest('[data-quick]');
+      if (q) { this.net.chat(q.dataset.quick); this.closeChat(); }
+      if (e.target.closest('.chat-send')) { this.sendChatFrom(chatInput); this.closeChat(); }
+      if (e.target.closest('.chat-close')) this.closeChat();
+    });
+    $('.coop-chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') this.sendChatFrom(e.target); });
+    $('.coop-name').addEventListener('change', () => this.saveCoopName());
+    for (const b of document.querySelectorAll('.coop-quick [data-quick]')) b.addEventListener('click', () => this.net.chat(b.dataset.quick));
+    const tc = $('.btn-chat'), tm = $('.btn-mic');
+    tc.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.openChat(); }, { passive: false });
+    tm.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.net.setMic(!this.net.micOn); }, { passive: false });
     $('.map-mode').addEventListener('click', () => { this.mapMode = this.mapMode === 'all' ? 'bravo' : 'all'; this.drawMap(); });
     $('.map-close').addEventListener('click', () => this.toggleMap(false));
     const bindRange = (id, out, key, fmt) => {
@@ -472,16 +499,10 @@ class Game {
     // network ids: the same construction order on both machines gives the same ids
     this.units.forEach((u, i) => { u.nid = i; });
     this.nextNid = 1000;
-    this.partner = null;
+    this.partners = new Map();
     if (this.net.active) {
-      this.player.nid = this.net.role === 'host' ? 'H' : 'G';
-      const pt = new Unit(this, 'army', m.player.x + 2, m.player.z + 1.5, { yaw: Math.PI, name: 'Partner', model: 'soldier_army' });
-      pt.remote = true;
-      pt.tag = 'partner';
-      pt.nid = this.net.role === 'host' ? 'G' : 'H';
-      pt.name = this.net.role === 'host' ? 'Partner' : 'Host';
-      this.partner = pt;
-      this.units.push(pt);
+      this.player.nid = this.net.myNid;
+      this.net.roster.filter((r) => r.nid !== this.net.myNid).forEach((r) => this.addPartner(r.nid, r.name));
     }
     this.world.units = this.units;
     this.escortZone = m.objectives.find((o) => o.type === 'escort')?.zone || [0, 0, 10];
@@ -1098,6 +1119,10 @@ class Game {
     if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : this.weapons.length - 1)) % this.weapons.length);
     if (inp.hit('KeyN')) this.toggleNVG();
     if (inp.hit('KeyQ')) this.switchWeapon((this.wi + 1) % this.weapons.length);
+    if (this.net.active) {
+      if (inp.hit('Enter')) this.openChat();
+      if (inp.hit('KeyK')) this.net.setMic(!this.net.micOn);
+    }
     if (inp.hit('KeyB')) { this.binos = !this.binos; this.audio.click(); }
     if (inp.hit('KeyG') && this.grenades > 0 && !this.binos) this.throwGrenade();
 
@@ -1303,13 +1328,109 @@ class Game {
   // ------------------------------------------------------------ co-op
 
   nearestHuman(pos) {
-    const p = this.player;
-    if (!this.partner || !this.partner.alive) return p;
-    return this.partner.pos.distanceTo(pos) < p.pos.distanceTo(pos) || !p.alive ? this.partner : p;
+    let best = this.player, bd = this.player.alive ? this.player.pos.distanceTo(pos) : Infinity;
+    for (const u of this.partners.values()) {
+      if (!u.alive) continue;
+      const d = u.pos.distanceTo(pos);
+      if (d < bd) { bd = d; best = u; }
+    }
+    return best;
+  }
+
+  // another player's soldier, moved by the network
+  addPartner(nid, name) {
+    const m = this.mission, k = this.partners.size + 1;
+    const pt = new Unit(this, 'army', m.player.x + 2 * k, m.player.z + 1.5, { yaw: Math.PI, name, model: 'soldier_army' });
+    pt.remote = true;
+    pt.tag = 'partner';
+    pt.nid = nid;
+    pt.name = name;
+    this.partners.set(nid, pt);
+    this.units.push(pt);
+    return pt;
+  }
+
+  renamePartner(nid, name) {
+    const u = this.partners.get(nid);
+    if (u) u.name = name;
+  }
+
+  onPlayerJoined(nid, name) {
+    this.onChat({ name: 'Co-op', text: `${name} joined the game` }, false, true);
+  }
+
+  saveCoopName() {
+    const el = $('.coop-name');
+    if (!el) return;
+    this.profile.setName(cleanName(el.value || this.profile.name));
+    el.value = this.profile.name;
+    if (this.net.role === 'guest') this.net.send({ t: 'name', name: this.profile.name });
+    if (this.net.role === 'host') {
+      const r = this.net.roster.find((x) => x.nid === 'H');
+      if (r) { r.name = this.profile.name; this.net.broadcast({ t: 'roster', roster: this.net.roster }); }
+    }
+    this.refreshCoop();
+  }
+
+  inviteText() {
+    return `Join my Wanni Front co-op game, from ${this.profile.name}: ${$('.coop-link').value}`;
+  }
+
+  // the phone's share sheet (WhatsApp, Messenger, SMS…) or copy as a fallback
+  async shareInvite() {
+    const url = $('.coop-link').value;
+    if (!url) return;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'Wanni Front co-op', text: `Join my Wanni Front co-op game, from ${this.profile.name}`, url }); return; } catch { /* cancelled */ }
+    }
+    navigator.clipboard?.writeText(url).then(() => this.toast('Invite link copied — paste it to your friends'), () => {});
+  }
+
+  // ------------------------------------------------------------ chat
+
+  onChat(m, mine, system = false) {
+    const line = { name: m.name, text: m.text, mine, system, t: performance.now() };
+    this.chatLog.push(line);
+    if (this.chatLog.length > 40) this.chatLog.shift();
+    if (!mine) this.audio.click?.();
+    this.renderChat();
+  }
+
+  renderChat() {
+    const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    const html = (l) => `<div class="cl${l.system ? ' sys' : ''}${l.mine ? ' mine' : ''}"><b>${esc(l.name)}</b> ${esc(l.text)}</div>`;
+    const lobby = $('.coop-chat-log');
+    if (lobby) { lobby.innerHTML = this.chatLog.slice(-12).map(html).join(''); lobby.scrollTop = 1e6; }
+    const hud = $('.chat-log');
+    if (hud) {
+      const now = performance.now();
+      hud.innerHTML = this.chatLog.filter((l) => now - l.t < 12000).slice(-5).map(html).join('');
+    }
+  }
+
+  sendChatFrom(el) {
+    if (!el || !el.value.trim()) return;
+    this.net.chat(el.value);
+    el.value = '';
+  }
+
+  openChat() {
+    if (!this.net.active) return;
+    const box = $('.chat-box');
+    box.classList.remove('hidden');
+    const inp = box.querySelector('input');
+    if (!this.input.touch) inp.focus();
+  }
+
+  closeChat() {
+    $('.chat-box').classList.add('hidden');
+    $('.chat-box input').blur();
+    if (this.state === 'playing' && !this.input.touch) this.input.requestLock();
   }
 
   showCoop() {
     this.state = 'menu';
+    $('.coop-name').value = this.profile.name;
     if (document.pointerLockElement) document.exitPointerLock();
     if (!this.net.status) this.net.setStatus('Not connected. Host a game, or open an invite link from a friend.');
     else this.net.onStatus(this.net.status);
@@ -1321,6 +1442,16 @@ class Game {
     const host = this.net.role === 'host';
     $('.coop-host-controls').classList.toggle('hidden', !(host && this.net.connected));
     $('[data-act="coop-host"]').classList.toggle('hidden', !!this.net.role);
+    $('.coop-via-row').classList.toggle('hidden', !!this.net.role);
+    $('.coop-social').classList.toggle('hidden', !this.net.role);
+    const esc = (s) => String(s).replace(/[<>&]/g, '');
+    $('.coop-players').innerHTML = this.net.roster.length
+      ? `<b>Players ${this.net.roster.length}/${MAX_PLAYERS}:</b> ${this.net.roster.map((r) => `<span class="chip">${r.nid === 'H' ? '★ ' : ''}${esc(r.name)}${r.nid === this.net.myNid ? ' (you)' : ''}</span>`).join(' ')}`
+      : '';
+    $('[data-act="coop-mic"]').textContent = this.net.micOn ? '🎤 Mic ON — tap to mute' : '🎤 Turn on mic (voice chat)';
+    $('[data-act="coop-mic"]').classList.toggle('on', this.net.micOn);
+    $('.btn-mic')?.classList.toggle('on', this.net.micOn);
+    this.renderChat();
     $('.coop-mission').innerHTML = MISSIONS.map((m, i) => (i <= this.profile.data.unlocked ? `<option value="${i}">${i + 1}. ${m.name} — ${m.date}</option>` : '')).join('');
   }
 
@@ -1344,36 +1475,42 @@ class Game {
 
   // guest: a unit the host created after the mission began (reinforcements)
   spawnRemote(nid, team, x, z, tag) {
-    if (typeof nid !== 'number') return null;
+    if (typeof nid !== 'number') {
+      // another player who joined after this mission was set up
+      if (nid === this.net.myNid || this.partners.has(nid) || !this.net.roster.some((r) => r.nid === nid)) return null;
+      return this.addPartner(nid, this.net.nameOf(nid));
+    }
     const u = new Unit(this, team, x, z, { tag, index: 50 });
     u.nid = nid;
     this.units.push(u);
     return u;
   }
 
-  partnerShot(m) {
+  partnerShot(m, from) {
     const a = new THREE.Vector3(...m.a), b = new THREE.Vector3(...m.b);
     if (!m.quiet || Math.random() < 0.3) this.fx.tracer(a, b);
     this.audio.shot(a, false);
-    if (this.partner) this.noise(this.partner.pos, m.noise, true);
+    const pt = this.partners.get(from);
+    if (pt) this.noise(pt.pos, m.noise, true);
     this.suppress(b, 2.5, 1.2);
   }
 
-  partnerHit(m) {
+  partnerHit(m, from) {
     const u = this.units.find((x) => x.nid === m.nid);
+    const src = this.partners.get(from) || null;
     if (!u || !u.alive) return;
     if (u.team === 'civ') {
-      if (m.aimed) u.damage(40, this.partner);
+      if (m.aimed) u.damage(40, src);
       this.civIncidents++;
       this.net.send({ t: 'toast', text: 'HOLD FIRE — civilians!', big: true });
       return;
     }
-    u.damage(m.dmg, this.partner);
+    u.damage(m.dmg, src);
     if (!u.alive && u.team === 'ltte') this.kills++;
   }
 
-  partnerGrenade(m) {
-    this.explode(new THREE.Vector3(...m.p), 7.5, 220, this.partner);
+  partnerGrenade(m, from) {
+    this.explode(new THREE.Vector3(...m.p), 7.5, 220, this.partners.get(from) || null);
   }
 
   partnerInteract(m) {
@@ -1387,15 +1524,19 @@ class Game {
     else this.missionFailed(m.reason);
   }
 
-  onPartnerLost() {
-    this.toast('Your partner has disconnected', true);
-    this.net.setStatus('Partner disconnected.');
-    if (this.partner) {
-      this.partner.remove();
-      this.units.splice(this.units.indexOf(this.partner), 1);
-      this.partner = null;
+  onPartnerLost(nid, name) {
+    this.toast(`${name} has left the game`, true);
+    this.onChat({ name: 'Co-op', text: `${name} left the game` }, false, true);
+    const u = this.partners.get(nid);
+    if (u) {
+      u.remove();
+      if (this.units.includes(u)) this.units.splice(this.units.indexOf(u), 1);
+      this.partners.delete(nid);
     }
-    if (this.net.role === 'guest' && this.state === 'playing') this.missionFailed('Lost the connection to the host.');
+    if (this.net.role === 'guest' && nid === 'H') {
+      this.net.setStatus('Lost the connection to the host.');
+      if (this.state === 'playing') this.missionFailed('Lost the connection to the host.');
+    } else if (this.net.role === 'host' && !this.net.connected) this.net.setStatus('Everyone has left. Share the invite link again to play together.');
     this.refreshCoop();
   }
 
@@ -1658,7 +1799,29 @@ class Game {
 
   // ------------------------------------------------------------ HUD
 
+  // co-op: name tags over other players, who is talking, recent chat
+  updateCoopHUD() {
+    const on = this.net.active && this.partners.size > 0;
+    $('#hud').classList.toggle('coop', !!this.net.role);
+    const tags = $('.nametags');
+    if (!on) { tags.innerHTML = ''; $('.voice').textContent = ''; return; }
+    const W = window.innerWidth, H = window.innerHeight, v = new THREE.Vector3();
+    let html = '';
+    for (const u of this.partners.values()) {
+      if (!u.alive) continue;
+      v.set(u.pos.x, u.pos.y + u.bodyHeight + 0.55, u.pos.z).project(this.camera);
+      if (v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1) continue;
+      const d = Math.round(u.pos.distanceTo(this.player.pos));
+      html += `<div class="ntag" style="left:${((v.x + 1) / 2) * W}px;top:${((1 - v.y) / 2) * H}px">${u.name}<small>${d} m · ${Math.max(0, Math.round(u.hp))}%</small></div>`;
+    }
+    tags.innerHTML = html;
+    const talk = this.net.talking();
+    $('.voice').innerHTML = `${this.net.micOn ? '<span class="mic-on">🎤 ON</span> ' : ''}${talk.map((n) => `🔊 ${n}`).join(' ')}`;
+    if (Math.floor(this.time * 2) !== this.lastChatRender) { this.lastChatRender = Math.floor(this.time * 2); this.renderChat(); }
+  }
+
   updateHUD() {
+    this.updateCoopHUD();
     const p = this.player;
     const hp = $('.hp-bar div');
     hp.style.width = `${Math.max(0, p.hp)}%`;
@@ -1676,7 +1839,7 @@ class Game {
     // squad status
     const allies = this.units.filter((u) => u.team === 'army' && !u.isPlayer && u.tag !== 'linkup' && !u.remote);
     const roleTag = { marksman: ' (marksman)', gunner: ' (gunner)', medic: ' (medic)' };
-    const partnerLine = this.partner ? `<span style="color:#7fc8e8">${this.partner.name} (co-op) · ${Math.max(0, Math.round(this.partner.hp))}%</span><br>` : '';
+    const partnerLine = [...this.partners.values()].map((u) => `<span style="color:#7fc8e8">${u.name} (co-op) · ${Math.max(0, Math.round(u.hp))}%</span><br>`).join('');
     $('.squad').innerHTML = partnerLine + allies.map((a) => `${a.name}${roleTag[a.role] || ''} · ${(a.order || 'follow').toUpperCase()}`
       + `${a.role === 'medic' ? (a.patient ? ' · treating' : ` · ${a.kits} dressings`) : ''}${a.hp < 60 ? ' · wounded' : ''}`).join('<br>');
 
@@ -2053,7 +2216,7 @@ loadModels((k) => { $('.loading-bar div').style.width = `${Math.round(k * 100)}%
       // opened from a co-op invite link
       game.profile.data.seenPrologue = true;
       game.showCoop();
-      game.net.join(join);
+      game.net.join(join, new URLSearchParams(location.search).get('via'));
       game.refreshCoop();
       return;
     }

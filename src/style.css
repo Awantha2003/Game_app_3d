@@ -379,3 +379,39 @@ body.nvg #nvg-overlay { display: block; }
     border-radius: 14px; font-size: 12px; white-space: nowrap; animation: hintfade 7s ease forwards; pointer-events: none; }
   @keyframes hintfade { 0%, 75% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
 }
+
+/* ---- co-op: names, chat, voice ---- */
+.coop-name-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; }
+.coop-name-row input, .coop-chat-row input, .chat-row input { flex: 1; min-width: 0; padding: 8px 10px; background: rgba(0, 0, 0, 0.35); color: inherit; border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 4px; font: inherit; }
+.coop-invite { flex-direction: column; align-items: stretch; }
+.coop-share-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.coop-players { margin: 10px 0; }
+.coop-players .chip { display: inline-block; padding: 2px 8px; margin: 2px; border: 1px solid rgba(127, 200, 232, 0.6); border-radius: 10px; }
+.coop-social { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.coop-social [data-act="coop-mic"].on { background: rgba(155, 209, 106, 0.25); border-color: #9bd16a; }
+.coop-chat-log { max-height: 160px; overflow-y: auto; padding: 8px; background: rgba(0, 0, 0, 0.3); border-radius: 4px; font-size: 14px; min-height: 40px; }
+.coop-chat-row, .chat-row { display: flex; gap: 6px; }
+.coop-quick, .chat-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn.small { padding: 4px 10px; font-size: 13px; }
+.cl b { color: #7fc8e8; margin-right: 4px; }
+.cl.mine b { color: #e0b84a; }
+.cl.sys { color: #9a9480; font-style: italic; }
+.nametags { position: absolute; inset: 0; pointer-events: none; }
+.ntag { position: absolute; transform: translate(-50%, -100%); color: #7fc8e8; font: 600 13px Oswald, sans-serif; letter-spacing: 0.06em; text-align: center; text-shadow: 0 1px 3px #000; white-space: nowrap; }
+.ntag small { display: block; font: 10px Inter, sans-serif; opacity: 0.8; }
+.voice { position: absolute; left: 16px; top: 128px; font-size: 13px; color: #9bd16a; }
+.voice .mic-on { color: #e0573a; }
+.chat-log { position: absolute; left: 16px; bottom: 150px; width: min(360px, 60vw); font-size: 13px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+.chat-box { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: min(520px, 92vw); padding: 10px; background: rgba(10, 12, 6, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; pointer-events: auto; display: flex; flex-direction: column; gap: 8px; z-index: 13; }
+.chat-box.hidden { display: none; }
+.tbtn.coop-only { display: none; }
+#hud.coop ~ #touch .tbtn.coop-only, body.coop #touch .tbtn.coop-only { display: block; }
+.btn-mic.on { background: rgba(224, 87, 58, 0.5); }
+@media (orientation: portrait) and (max-width: 700px) {
+  .chat-log { top: 330px; bottom: auto; }
+  .voice { top: 300px; }
+}
+
+.coop-via-row { display: flex; gap: 10px; align-items: center; margin: 6px 0; }
+.coop-via-row select { flex: 1; min-width: 0; padding: 6px; }

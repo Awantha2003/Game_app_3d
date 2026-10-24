@@ -62,16 +62,20 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **New objective type, *hold*:** stay inside the marked position until the timer runs out while counter-attack waves arrive from different directions.
 - **Insertion scenes:** the squad arrives by Bell 212-style helicopter (Thoppigala, Elephant Pass), by Navy Arrow boat onto the Pooneryn beach, or by Buffel APC. You can skip them with Space.
 
-## Co-op (2 players)
+## Co-op (up to 4 players)
 
-Choose **Co-op** in the main menu, then **Host a game**, and send the invite link to a friend. When they open it, the two browsers connect directly over WebRTC. The public PeerJS server is used only to introduce them. The host picks any mission they have unlocked and starts it.
+Choose **Co-op** in the main menu, type your name, then **Host a game**. Send the invite link to your friends with **Share invite** (your phone's share sheet), **WhatsApp** or **Copy link**. When a friend opens the link, they type their name and appear in the lobby. The host picks any mission they have unlocked and starts it for everyone.
 
-- The host's game runs the mission: AI, objectives, civilians and damage. The guest moves and shoots their own soldier.
-- The guest's hits, grenades, alarm sabotage and charges are sent to the host, who applies them. The host sends the state of every unit about 15 times a second.
-- Both players earn XP. If either player is killed, the mission fails.
-- If the guest disconnects, the host carries on alone. If the host disconnects, the guest's mission ends.
-- Insertion cinematics are skipped in co-op.
-- Limitations: there is no relay (TURN) server, so some strict corporate or mobile networks can block the direct connection. Only two players are supported.
+- **Talk:** turn on the 🎤 mic in the lobby, with the MIC button on a phone, or with K. Voice goes directly between every pair of players. The HUD shows 🔊 and the name of whoever is talking.
+- **Chat:** type in the lobby, or press Enter during a mission (CHAT on a phone). Quick messages are available: "Follow me", "Enemy spotted!", "Need help!" and more.
+- **Names:** every player's name floats above their soldier, with their distance and health, and is listed in the squad panel.
+- **How it works:** the host's game runs the mission: AI, objectives, civilians and damage. Each friend moves and shoots their own soldier. Their hits, grenades, alarm sabotage and charges are sent to the host, who applies them. The host sends the state of every unit about 15 times a second.
+- **Outcomes:** everyone earns XP. If any player is killed, the mission fails. If a friend leaves, the others carry on. If the host leaves, the mission ends for everyone else.
+- **Connection:** the browsers find each other in one of two ways:
+  - **Server 1** (default): Trystero over several public Nostr relays at once, so it does not depend on any single server.
+  - **Server 2**: the PeerJS public server, retried automatically on network errors.
+  - If one doesn't connect, the host can switch to the other and send a new link. After that, game traffic goes directly between the browsers (WebRTC).
+- **Limitations:** there is no relay (TURN) server, so some strict corporate or mobile networks can still block the direct connection. The host's page must stay open. Insertion cinematics are skipped in co-op.
 
 ## Environment and presentation
 
@@ -109,7 +113,13 @@ npm run test:campaign -- 0 3      # only missions 1 and 4
 
 `node tests/shots.mjs <dir> [low|medium|high] [mission indices]` saves a gameplay screenshot of each mission and prints draw calls and triangles (run `npm run build` first).
 
-`npm run test:coop` runs a local PeerServer and connects two headless browser pages. It checks the invite link, the mission start, unit and position sync, the guest's hits, objective progress, mission completion and XP for the guest, and a disconnect.
+`npm run test:coop` (Server 1, through a local Trystero relay) and `COOP_VIA=p npm run test:coop` (Server 2, through a local PeerServer) each connect three headless browser pages: a host and two friends. They check:
+
+- names and the share buttons
+- text chat and voice (a fake microphone)
+- the mission start for everyone, and unit and position sync between all players
+- hits, objective progress, mission completion and XP for the friends
+- a player leaving
 
 `npm run build && npm run test:mobile` checks phone controls in portrait: the joystick is visible, aiming the T-56 does not show the sniper scope, and the joystick walks and runs.
 
@@ -180,7 +190,7 @@ src/world.js              terrain shader, sky, water, props, grass, collision an
 src/atmosphere.js         per-mission lighting, fog, weather and colour grade
 src/weather.js            rain, mist, dust, smoke and lightning
 src/postfx.js             MSAA, bloom, tone mapping and colour grade
-src/net.js                two-player co-op over WebRTC (PeerJS)
+src/net.js                co-op for up to 4 players: Trystero/PeerJS links, chat, voice
 src/units.js              soldiers and civilians: animation and AI
 src/fx.js, src/audio.js   effects and procedural sound
 src/input.js              keyboard, mouse and touch controls

@@ -15,6 +15,8 @@ export class Input {
     this.sprintToggle = false;
 
     window.addEventListener('keydown', (e) => {
+      // typing a chat message or a name is not game input
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName)) return;
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
     });

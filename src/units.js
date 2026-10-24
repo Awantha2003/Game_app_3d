@@ -123,7 +123,7 @@ export class Unit {
 
   damage(amount, from) {
     if (!this.alive) return;
-    if (this.remote) { this.game.net?.send({ t: 'dmg', v: Math.round(amount) }); this.lastHurt = this.game.time; return; }
+    if (this.remote) { this.game.net?.sendTo(this.nid, { t: 'dmg', v: Math.round(amount) }); this.lastHurt = this.game.time; return; }
     if (this.team === 'army' && !this.isPlayer) {
       // allies are wounded but never killed, so the squad stays with the player
       this.hp = Math.max(25, this.hp - amount);
