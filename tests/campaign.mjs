@@ -32,20 +32,24 @@ try {
   check(true, 'start screen shown after loading');
 
   // first start plays the prologue; skip it
-  await page.click('[data-act="start"]');
+  // software rendering in headless Chromium is slow: stop drawing frames and
+  // click through the DOM so the test does not wait on the renderer
+  await page.evaluate(() => window.__game.renderer.setAnimationLoop(null));
+  const tap = (sel) => page.$eval(sel, (b) => b.click());
+  await tap('[data-act="start"]');
   await page.waitForSelector('#prologue:not(.hidden)', { timeout: 5000 });
   check(true, 'prologue plays on first start');
   await page.waitForTimeout(1500);
-  await page.click('.pro-skip');
+  await tap('.pro-skip');
   await page.waitForSelector('[data-screen="menu"]:not(.hidden)', { timeout: 5000 });
   check(true, 'prologue can be skipped and the main menu opens');
 
   // every enabled main-menu button opens something
   for (const act of ['missions', 'loadout', 'squad', 'profile', 'archive', 'settings', 'credits']) {
-    await page.click(`[data-screen="menu"] [data-act="${act}"]`);
+    await tap(`[data-screen="menu"] [data-act="${act}"]`);
     const open = await page.evaluate(() => [...document.querySelectorAll('#screen .panel')].find((p) => !p.classList.contains('hidden'))?.dataset.screen);
     check(open === act, `menu "${act}" opens`);
-    await page.click(`[data-screen="${act}"] [data-act="${act === 'loadout' ? 'loadout-back' : 'menu'}"]`);
+    await tap(`[data-screen="${act}"] [data-act="${act === 'loadout' ? 'loadout-back' : 'menu'}"]`);
   }
 
   // play the campaign with an in-page bot (rendering is skipped for speed)
@@ -111,7 +115,6 @@ try {
         stuck: g.state === 'playing' ? `objective ${g.objIndex + 1} "${g.currentObjective()?.text}" ${document.querySelector('.obj-sub').textContent}, player at ${g.player.pos.x.toFixed(0)},${g.player.pos.z.toFixed(0)}` : '',
         totalXP: g.profile.xp, rank: g.profile.rank.id,
       };
-      g.renderer.setAnimationLoop(() => g.frame());
       return out;
     }, i);
     check(r.fiction, `mission ${i + 1}: briefing shows the fiction block`);
