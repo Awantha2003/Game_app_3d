@@ -53,7 +53,7 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **Jump and crawl:** Space jumps when you are standing, and stands you up when you are crouched or prone. Z goes prone so you can crawl.
 - **Enemy weapons:** a fallen cadre drops his weapon. Most carry T-56 rifles, sentries carry SVDs, and some carry machine guns. Walk up and hold E (or tap E) to take it: the same weapon gives you its ammunition, and a different one swaps into its slot (rifle or machine gun as primary, SVD as marksman rifle) while your old weapon is dropped. Q cycles weapons.
 - **Planning on the map:** open the map (M or the MAP button). Tap or click any spot to send Bravo team there, or switch the order to the whole section. Planned moves are drawn on the map. On a desktop the mouse is freed while the map is open.
-- **Phones:** on-screen buttons for jump, crouch, prone, map, weapon, grenade, binoculars, squad, medic and night vision, plus move, look, fire, aim (toggle), reload, interact and run. In portrait the camera pulls back with a wider field of view and the HUD is compacted. A hint suggests turning the phone sideways, which still gives the best view.
+- **Phones:** a visible MOVE joystick that follows your thumb. Pushing it all the way forward runs, and also lowers an aimed weapon. RUN toggles running. On-screen buttons for jump, crouch, prone, map, weapon, grenade, binoculars, squad, medic and night vision, plus move, look, fire, aim (toggle), reload, interact and run. In portrait the camera pulls back with a wider field of view and the HUD is compacted. A hint suggests turning the phone sideways, which still gives the best view.
 - **Loadout:** choose your gear from the menu or the briefing. Some items unlock by rank:
   - **Primary weapon:** T-56 rifle, or a light machine gun with a 100-round belt (Lieutenant). The machine gun makes you slower and takes longer to reload.
   - **Equipment:** three grenades, extra magazines (+50% ammunition, Lieutenant), or a pouch of five grenades (Captain).
@@ -110,6 +110,8 @@ npm run test:campaign -- 0 3      # only missions 1 and 4
 `node tests/shots.mjs <dir> [low|medium|high] [mission indices]` saves a gameplay screenshot of each mission and prints draw calls and triangles (run `npm run build` first).
 
 `npm run test:coop` runs a local PeerServer and connects two headless browser pages. It checks the invite link, the mission start, unit and position sync, the guest's hits, objective progress, mission completion and XP for the guest, and a disconnect.
+
+`npm run build && npm run test:mobile` checks phone controls in portrait: the joystick is visible, aiming the T-56 does not show the sniper scope, and the joystick walks and runs.
 
 `npm run build && npm run test:systems` checks the medic, natural healing to 60%, suppression, the gunner's machine gun, cover search, rank-locked loadout items, the machine gun and grenade pouch, night vision and the loadout screen.
 

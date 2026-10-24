@@ -1019,7 +1019,7 @@ class Game {
   }
 
   isScoped() {
-    return this.W.scope && this.input.aim && this.reloading <= 0 && this.player.alive && !this.binos;
+    return this.W.scope === true && this.input.aim && this.reloading <= 0 && this.player.alive && !this.binos;
   }
 
   // ------------------------------------------------------------ player
@@ -1700,8 +1700,12 @@ class Game {
     $('.ammo-name').textContent = this.W.name.toUpperCase();
     $('.ammo-gren').textContent = `GRENADES ${this.grenades} (G)`;
     $('.stance-ind').textContent = `${p.stance.toUpperCase()}${p.towerCenter ? ' · TOWER' : ''}${this.world.inBush(p.pos.x, p.pos.z) ? ' · IN COVER' : ''}`;
-    $('.scope').classList.toggle('on', scoped);
-    $('.binos').classList.toggle('on', binos);
+    // set display directly as well: some phone browsers kept showing the scope
+    const sc = $('.scope'), bn = $('.binos');
+    sc.classList.toggle('on', !!scoped);
+    sc.style.display = scoped ? 'block' : 'none';
+    bn.classList.toggle('on', !!binos);
+    bn.style.display = binos ? 'block' : 'none';
     $('.crosshair').style.display = scoped || binos ? 'none' : '';
     $('.breath div').style.width = `${this.breath * 100}%`;
     if (binos) {

@@ -92,7 +92,9 @@ export class Input {
   }
 
   get sprint() {
-    return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.sprintToggle;
+    // a joystick pushed all the way forward also runs
+    const fullStick = this.stick.id !== null && -this.stick.y > 0.92 && !this.aim;
+    return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.sprintToggle || fullStick;
   }
 
   get action() {
@@ -111,8 +113,10 @@ export class Input {
       const t = e.changedTouches[0];
       this.stick.id = t.identifier;
       this.stick.ox = t.clientX; this.stick.oy = t.clientY;
+      // the joystick jumps to where the thumb lands
       stickEl.style.left = `${t.clientX - 60}px`;
       stickEl.style.top = `${t.clientY - 60}px`;
+      stickEl.style.bottom = 'auto';
       stickEl.classList.add('on');
       e.preventDefault();
     }, { passive: false });
@@ -128,6 +132,8 @@ export class Input {
           const d = Math.hypot(dx, dy);
           if (d > R) { dx *= R / d; dy *= R / d; }
           this.stick.x = dx / R; this.stick.y = dy / R;
+          // pushing the stick all the way forward lowers the weapon and runs
+          if (this.stick.y < -0.92 && this.aim) { this.aim = false; this.aimBtn?.classList.remove('on'); }
           knob.style.transform = `translate(${dx}px, ${dy}px)`;
         } else if (this.lookTouch && t.identifier === this.lookTouch.id) {
           this.lookX += (t.clientX - this.lookTouch.x) * 1.6;
@@ -142,6 +148,8 @@ export class Input {
           this.stick.id = null; this.stick.x = this.stick.y = 0;
           knob.style.transform = '';
           stickEl.classList.remove('on');
+          // back to its resting place, where it stays visible
+          stickEl.style.left = stickEl.style.top = stickEl.style.bottom = '';
         }
         if (this.lookTouch && t.identifier === this.lookTouch.id) this.lookTouch = null;
       }
@@ -156,6 +164,7 @@ export class Input {
     };
     hold('.btn-fire', () => { this.fire = true; }, () => { this.fire = false; });
     const aimBtn = root.querySelector('.btn-aim');
+    this.aimBtn = aimBtn;
     hold('.btn-aim', () => { this.aim = !this.aim; aimBtn.classList.toggle('on', this.aim); }, () => {});
     // small buttons send the same key as the keyboard
     for (const el of root.querySelectorAll('[data-key]')) {
@@ -164,7 +173,13 @@ export class Input {
     }
     hold('.btn-reload', () => this.pressed.add('KeyR'), () => {});
     hold('.btn-action', () => { this.touchAction = true; }, () => { this.touchAction = false; });
-    hold('.btn-sprint', () => { this.sprintToggle = !this.sprintToggle; }, () => {});
+    const runBtn = root.querySelector('.btn-sprint');
+    hold('.btn-sprint', () => {
+      this.sprintToggle = !this.sprintToggle;
+      runBtn.classList.toggle('on', this.sprintToggle);
+      // running lowers the weapon
+      if (this.sprintToggle && this.aim) { this.aim = false; aimBtn.classList.remove('on'); }
+    }, () => {});
     hold('.btn-pause', () => this.pressed.add('Escape'), () => {});
   }
 }

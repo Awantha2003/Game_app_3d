@@ -126,10 +126,14 @@ select { background: #222818; color: var(--ink); border: 1px solid var(--line); 
 
 /* ---------------- touch ---------------- */
 #touch { position: fixed; inset: 0; z-index: 11; pointer-events: none; }
-#touch .stick-zone { position: absolute; left: 0; bottom: 0; width: 45%; height: 60%; pointer-events: auto; }
+#touch .stick-zone { position: absolute; left: 0; bottom: 0; width: 50%; height: 240px; pointer-events: auto; }
 #touch .look-zone { position: absolute; right: 0; top: 0; width: 55%; height: 100%; pointer-events: auto; }
-#touch .stick { position: absolute; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.3); opacity: 0; }
+#touch .stick { position: absolute; left: 22px; bottom: 30px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.45);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.25)); opacity: 0.75; pointer-events: none; }
 #touch .stick.on { opacity: 1; }
+#touch .stick-label { position: absolute; left: 0; right: 0; top: -20px; text-align: center; font: 11px Oswald, sans-serif; letter-spacing: 0.15em; color: rgba(255, 255, 255, 0.7); }
+#touch .stick.on .stick-label { display: none; }
+.btn-sprint.on { background: rgba(224, 184, 74, 0.45); }
 #touch .knob { position: absolute; left: 35px; top: 35px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255, 255, 255, 0.35); }
 .tbtn { position: absolute; pointer-events: auto; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); background: rgba(0, 0, 0, 0.35);
   color: #fff; font-family: Oswald, sans-serif; font-size: 14px; width: 62px; height: 62px; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -138,7 +142,7 @@ select { background: #222818; color: var(--ink); border: 1px solid var(--line); 
 .btn-aim { right: 124px; bottom: 40px; }
 .btn-reload { right: 120px; bottom: 140px; width: 48px !important; height: 48px !important; }
 .btn-action { right: 30px; bottom: 196px; width: 52px !important; height: 52px !important; }
-.btn-sprint { left: 24px; bottom: 150px; width: 52px !important; height: 52px !important; }
+.btn-sprint { left: 150px; bottom: 204px; width: 52px !important; height: 52px !important; }
 .btn-pause { right: 16px; top: 60px; width: 40px !important; height: 40px !important; }
 #hud.touch-mode .ammo { bottom: auto; top: 110px; }
 #hud.touch-mode .status { bottom: auto; top: 110px; }
@@ -351,7 +355,7 @@ body.nvg #nvg-overlay { display: block; }
 
 /* ---- touch: extra buttons, portrait layout ---- */
 .tcol { position: absolute; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-.tcol-left { left: 14px; bottom: 214px; }
+.tcol-left { left: 14px; bottom: 250px; }
 .tcol-right { right: 10px; top: 110px; }
 .tbtn.tsm { position: static; width: 54px !important; height: 34px !important; border-radius: 17px; font-size: 11px; letter-spacing: 0.06em; pointer-events: auto; }
 .btn-aim.on { background: rgba(224, 184, 74, 0.45); }
@@ -367,7 +371,7 @@ body.nvg #nvg-overlay { display: block; }
   #titlecard .tc-name { font-size: 26px; }
   #titlecard .tc-sub { font-size: 10px; }
   .tcol-right { top: 220px; gap: 6px; }
-  .tcol-left { bottom: 206px; gap: 6px; }
+  .tcol-left { bottom: 250px; gap: 6px; }
   #hud .radio { top: 198px; bottom: auto; right: 76px; font-size: 12px; }
   #hud .stealth { right: 66px; font-size: 11px; padding: 3px 8px; }
   #titlecard { top: 36vh; }

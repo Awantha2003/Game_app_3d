@@ -10,7 +10,8 @@
     "assets": "blender -b -P blender/build_assets.py",
     "test:campaign": "node tests/campaign.mjs",
     "test:coop": "node tests/coop.mjs",
-    "test:systems": "node tests/systems.mjs"
+    "test:systems": "node tests/systems.mjs",
+    "test:mobile": "node tests/mobile.mjs"
   },
   "repository": {
     "type": "git",
