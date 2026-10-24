@@ -21,6 +21,9 @@ import { World } from './world.js';
 const $ = (s, r = document) => r.querySelector(s);
 
 // The player's weapons. Noise is how far (m) the shot is heard.
+// which weapon slot a weapon goes into (1 primary, 2 pistol, 3 marksman)
+const SLOT = { t56: 0, lmg: 0, pistol: 1, svd: 2 };
+
 const WEAPONS = [
   { id: 'lmg', name: 'Light machine gun', mag: 100, reserve: 300, interval: 0.085, auto: true, body: 40, head: 120, spreadHip: 0.026, spreadAim: 0.007, recoil: 0.011, noise: 90, reload: 5.2, heavy: true },
   { id: 't56', name: 'T-56 rifle', mag: 30, reserve: 240, interval: 0.1, auto: true, body: 36, head: 120, spreadHip: 0.012, spreadAim: 0.003, recoil: 0.009, noise: 70, reload: 2.2 },
@@ -61,7 +64,7 @@ class Game {
     this.resize();
     window.addEventListener('resize', () => this.resize());
     document.addEventListener('pointerlockchange', () => {
-      if (!this.input.locked && this.state === 'playing') this.pause();
+      if (!this.input.locked && this.state === 'playing' && !this.mapOpen) this.pause();
     });
     this.bindUI();
     this.renderer.setAnimationLoop(() => this.frame());
@@ -176,6 +179,9 @@ class Game {
       };
       actions[act]?.();
     });
+    $('#map canvas').addEventListener('click', (e) => this.mapOrder(e));
+    $('.map-mode').addEventListener('click', () => { this.mapMode = this.mapMode === 'all' ? 'bravo' : 'all'; this.drawMap(); });
+    $('.map-close').addEventListener('click', () => this.toggleMap(false));
     const bindRange = (id, out, key, fmt) => {
       const el = $(id);
       el.addEventListener('input', () => {
@@ -453,7 +459,13 @@ class Game {
     }
     let idx = 10;
     for (const s of this.world.spawns) {
-      const u = new Unit(this, s.team, s.x, s.z, { tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI, patrol: s.patrol, sentry: s.sentry });
+      // cadres carry T-56 rifles; sentries an SVD and every sixth a machine gun
+      const wid = s.team !== 'ltte' ? null : s.sentry ? 'svd' : idx % 6 === 0 ? 'lmg' : 't56';
+      const u = new Unit(this, s.team, s.x, s.z, {
+        tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI, patrol: s.patrol, sentry: s.sentry,
+        weapon: wid && wid !== 't56' ? `wpn_${wid}` : null, role: wid === 'lmg' ? 'gunner' : undefined,
+      });
+      u.weaponId = wid;
       if (s.team === 'ltte') u.yaw = Math.atan2(m.player.x - s.x, m.player.z - s.z) + (Math.random() - 0.5) * 1.8;
       this.units.push(u);
     }
@@ -485,6 +497,10 @@ class Game {
     this.wi = 0;
     this.applyLoadout();
     this.projectiles = [];
+    this.pickups = [];
+    this.jumpH = 0;
+    this.jumpV = 0;
+    this.mapMode = this.mapMode || 'bravo';
     this.binos = false;
     this.breath = 1;
     this.swayT = 0;
@@ -780,6 +796,7 @@ class Game {
     }
     if (u.team === 'civ') { this.missionFailed('A civilian was killed. Protecting civilians is your first duty.'); return; }
     if (u.team === 'ltte') {
+      this.dropWeapon(u);
       this.killfeed('LTTE cadre neutralised');
       for (const a of this.world.alarms) if (a.runner === u) { a.runner = null; this.toast('Alarm runner stopped'); }
     }
@@ -1020,7 +1037,11 @@ class Game {
     // stance
     if (inp.hit('KeyC')) p.stance = p.stance === 'crouch' ? 'stand' : 'crouch';
     if (inp.hit('KeyZ')) p.stance = p.stance === 'prone' ? 'stand' : 'prone';
-    if (inp.hit('Space')) p.stance = 'stand';
+    if (inp.hit('Space')) {
+      // Space stands up; when already standing, it jumps
+      if (p.stance !== 'stand') p.stance = 'stand';
+      else if (!this.jumpH && !p.towerCenter) { this.jumpV = 4.6; this.jumpH = 0.001; this.audio.burst({ dur: 0.05, freq: 300, vol: 0.08 }); }
+    }
 
     const scoped = this.isScoped();
     const mv = inp.moveVec;
@@ -1033,6 +1054,12 @@ class Game {
     const sx = p.pos.x, sz = p.pos.z;
     p.move(fx * mv.y + rx * mv.x, fz * mv.y + rz * mv.x, speed * Math.min(1, Math.hypot(mv.x, mv.y)), dt);
     p.separate();
+    if (this.jumpH > 0) {
+      this.jumpV -= 14 * dt;
+      this.jumpH = Math.max(0, this.jumpH + this.jumpV * dt);
+      p.pos.y += this.jumpH;
+      if (this.jumpH === 0) this.noise(p.pos, 5, false);
+    }
     p.yaw = this.yaw;
     p.pitch = this.pitch;
     p.sync(dt);
@@ -1061,6 +1088,7 @@ class Game {
     const wheel = inp.consumeWheel();
     if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : this.weapons.length - 1)) % this.weapons.length);
     if (inp.hit('KeyN')) this.toggleNVG();
+    if (inp.hit('KeyQ')) this.switchWeapon((this.wi + 1) % this.weapons.length);
     if (inp.hit('KeyB')) { this.binos = !this.binos; this.audio.click(); }
     if (inp.hit('KeyG') && this.grenades > 0 && !this.binos) this.throwGrenade();
 
@@ -1411,6 +1439,57 @@ class Game {
     this.audio.hitmark();
   }
 
+  // ------------------------------------------------------------ weapon pickups
+
+  // a fallen cadre's weapon is left on the ground and can be taken
+  dropWeapon(u, id = u.weaponId || 't56', ammo = null) {
+    if (!this.world || u.dropped) return;
+    u.dropped = true;
+    const def = WEAPONS.find((w) => w.id === id);
+    const model = models[`wpn_${id}`];
+    if (!def || !model) return;
+    const x = u.pos.x + (Math.random() - 0.5) * 1.2, z = u.pos.z + (Math.random() - 0.5) * 1.2;
+    const obj = model.clone(true);
+    obj.position.set(x, this.world.height(x, z) + 0.06, z);
+    obj.rotation.set(0, Math.random() * Math.PI * 2, Math.PI / 2);
+    this.world.group.add(obj);
+    this.pickups.push({ id, x, z, obj, ammo: ammo ?? def.mag * (1 + Math.floor(Math.random() * 2)) });
+    if (this.pickups.length > 40) { const old = this.pickups.shift(); this.world.group.remove(old.obj); }
+  }
+
+  nearestPickup() {
+    const p = this.player.pos;
+    let best = null, bd = 1.8;
+    for (const k of this.pickups) {
+      const d = Math.hypot(k.x - p.x, k.z - p.z);
+      if (d < bd) { bd = d; best = k; }
+    }
+    return best;
+  }
+
+  // same weapon: take its ammunition; another weapon: swap it into its slot
+  pickUp(pk) {
+    const slot = SLOT[pk.id], cur = this.weapons[slot], def = WEAPONS.find((w) => w.id === pk.id);
+    this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
+    this.pickups.splice(this.pickups.indexOf(pk), 1);
+    this.world.group.remove(pk.obj);
+    if (cur.id === pk.id) {
+      const st = this.wstate[slot];
+      st.reserve = Math.min(def.reserve * 2, st.reserve + pk.ammo);
+      this.toast(`+${pk.ammo} rounds (${def.name})`);
+    } else {
+      const st = this.wstate[slot];
+      this.dropWeapon({ pos: this.player.pos }, cur.id, st.ammo + st.reserve);
+      this.weapons[slot] = { ...def };
+      this.wstate[slot] = { ammo: Math.min(def.mag, pk.ammo), reserve: Math.max(0, pk.ammo - def.mag) };
+      this.toast(`Picked up the ${def.name}`);
+    }
+    if (slot === this.wi) ({ ammo: this.ammo, reserve: this.reserve } = this.wstate[slot]);
+    if (slot !== this.wi) this.switchWeapon(slot);
+    else { this.reloading = 0; this.showWeapon(); }
+    this.audio.click();
+  }
+
   completeTarget(t) {
     if (this.net.active && this.net.role === 'guest') {
       this.net.send({ t: 'interact', kind: 'target', i: this.world.targets.indexOf(t) });
@@ -1449,6 +1528,14 @@ class Game {
       return {
         label: 'Sabotage the alarm', time: 3,
         done: () => this.completeAlarm(a),
+      };
+    }
+    const pk = this.nearestPickup();
+    if (pk) {
+      const slot = SLOT[pk.id], cur = this.weapons[slot], def = WEAPONS.find((w) => w.id === pk.id);
+      return {
+        label: cur.id === pk.id ? `Take ammunition (${def.name})` : `Take the ${def.name} (drop your ${cur.name})`,
+        time: 0.6, done: () => this.pickUp(pk),
       };
     }
     const pl = this.player;
@@ -1495,6 +1582,13 @@ class Game {
 
   // ------------------------------------------------------------ camera
 
+  // widen the vertical field of view on portrait screens so the view is not
+  // cropped to a narrow slice (up to about 1.45x)
+  portraitZoom() {
+    const a = this.camera.aspect;
+    return a < 0.9 ? Math.min(1.45, Math.sqrt(0.9 / a) * 1.05) : 1;
+  }
+
   updateCamera(dt, snap = false) {
     const p = this.player, inp = this.input;
     const scoped = this.isScoped(), binos = this.binos && p.alive;
@@ -1518,14 +1612,16 @@ class Game {
       this.camera.position.copy(eye);
       this.camera.lookAt(eye.clone().add(d));
       p.obj.visible = false;
-      fov = binos ? 7 : 11;
+      fov = (binos ? 7 : 11) * this.portraitZoom();
     } else {
       p.obj.visible = true;
       const aim = inp.aim && p.alive;
       const right = new THREE.Vector3(-Math.cos(yaw), 0, Math.sin(yaw));
       const pivot = p.pos.clone().add(new THREE.Vector3(0, p.alive ? p.eyeHeight + 0.23 : 0.8, 0));
-      const dist = aim ? 1.6 : p.stance === 'prone' ? 2.5 : 3.2;
-      const side = aim ? 0.6 : 0.85;
+      // on a tall, narrow phone screen: soldier in the middle, camera further back
+      const portrait = this.camera.aspect < 0.9;
+      const dist = (aim ? 1.6 : p.stance === 'prone' ? 2.5 : 3.2) + (portrait ? (aim ? 0.4 : 0.7) : 0);
+      const side = (aim ? 0.6 : 0.85) * (portrait ? 0.35 : 1);
       let want = pivot.clone().addScaledVector(right, side).addScaledVector(d, -dist);
       // keep the camera out of walls
       const toCam = want.clone().sub(pivot);
@@ -1539,7 +1635,7 @@ class Game {
       else this.camPos.lerp(want, Math.min(1, dt * 18));
       this.camera.position.copy(this.camPos);
       this.camera.lookAt(this.camPos.clone().add(d));
-      fov = aim ? 48 : 70;
+      fov = (aim ? 48 : 70) * this.portraitZoom();
     }
     if (this.fx.shake > 0) {
       const s = this.fx.shake * 0.15;
@@ -1665,9 +1761,34 @@ class Game {
   // ------------------------------------------------------------ tactical map
 
   toggleMap(force) {
+    const was = this.mapOpen;
     this.mapOpen = force ?? !this.mapOpen;
     $('#map').classList.toggle('hidden', !this.mapOpen);
     if (this.mapOpen) this.drawMap();
+    // the mouse is needed to plan on the map; give it back afterwards
+    if (this.mapOpen && !was && document.pointerLockElement) document.exitPointerLock();
+    if (!this.mapOpen && was && this.state === 'playing') this.input.requestLock();
+  }
+
+  // plan on the map: send Bravo team, or the whole section, to the tapped spot
+  mapOrder(e) {
+    if (!this.world || this.state !== 'playing') return;
+    const cv = $('#map canvas'), r = cv.getBoundingClientRect(), S = this.world.size;
+    const x = ((e.clientX - r.left) / r.width) * 2 * S - S, z = ((e.clientY - r.top) / r.height) * 2 * S - S;
+    if (Math.abs(x) > S || Math.abs(z) > S || this.world.isWater(x, z, 0.2)) { this.toast('Pick a spot on land'); return; }
+    const point = new THREE.Vector3(x, this.world.height(x, z), z);
+    const allies = this.squadAllies();
+    const group = this.mapMode === 'all' ? allies : allies.length > 1 ? allies.filter((a) => a.followSlot % 2 === 1) : allies;
+    if (!group.length) return;
+    group.forEach((a, i) => {
+      a.order = 'move';
+      a.orderPos = point.clone().add(new THREE.Vector3((i - (group.length - 1) / 2) * 2.5, 0, 0));
+    });
+    if (this.mapMode === 'all') this.squadOrders.mode = 'hold';
+    this.squadOrders.bravo = 'move';
+    const dist = Math.round(point.distanceTo(this.player.pos));
+    this.radio.say([[this.speakerKey(group[0]), `${this.mapMode === 'all' ? 'Section' : 'Bravo'} moving to the marked spot — ${dist} metres.`]]);
+    this.drawMap();
   }
 
   buildMapBase() {
@@ -1732,6 +1853,16 @@ class Game {
     }
     const wp = this.objectiveWaypoint();
     if (wp) glyph(wp.x, wp.z, '◇', '#e0b84a', 22);
+    // planned moves
+    ctx.strokeStyle = 'rgba(155, 209, 106, 0.7)';
+    ctx.setLineDash([4, 4]);
+    for (const a of this.squadAllies()) {
+      if (a.order !== 'move' || !a.orderPos) continue;
+      const [ax, ay] = toMap(a.pos.x, a.pos.z), [bx, by] = toMap(a.orderPos.x, a.orderPos.z);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      glyph(a.orderPos.x, a.orderPos.z, '✕', '#9bd16a', 14);
+    }
+    ctx.setLineDash([]);
     const [px, py] = toMap(this.player.pos.x, this.player.pos.z);
     ctx.save();
     ctx.translate(px, py);
@@ -1739,7 +1870,8 @@ class Game {
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
     ctx.restore();
-    $('.map-info').innerHTML = `<b>${this.mission.name.toUpperCase()}</b> · ${o ? o.text : ''}<br><span>▲ you · ● squad · ◆ marked hostile · ⚑ alarm · ▲ tower · ✚ supplies · ◇ objective · N is up · M to close</span>`;
+    $('.map-info').innerHTML = `<b>${this.mission.name.toUpperCase()}</b> · ${o ? o.text : ''}<br><span>▲ you · ● squad · ✕ planned move · ◆ marked hostile · ⚑ alarm · ▲ tower · ✚ supplies · ◇ objective · N is up</span><br><span>Tap or click the map to send ${this.mapMode === 'all' ? 'the whole section' : 'Bravo team'} there.</span>`;
+    $('.map-mode').textContent = this.mapMode === 'all' ? 'Orders: whole section' : 'Orders: Bravo team';
   }
 
   updateCompass(wp) {

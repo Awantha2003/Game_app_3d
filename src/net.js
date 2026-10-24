@@ -200,7 +200,7 @@ export class Net {
       u.speed = speed;
       u.marked = u.marked || !!marked;
       if (u.team === 'civ') u.state = wait ? 'wait' : 'flee';
-      if (u.alive && !alive) { u.alive = false; u.hp = 0; u.deadTime = 0; if (u.team === 'ltte') g.killfeed('LTTE cadre neutralised'); }
+      if (u.alive && !alive) { u.alive = false; u.hp = 0; u.deadTime = 0; if (u.team === 'ltte') { g.dropWeapon(u); g.killfeed('LTTE cadre neutralised'); } }
     }
     for (const u of [...g.units]) {
       if (!u.isPlayer && !u.remote && u.nid !== undefined && !seen.has(u.nid) && !u.alive) { u.remove(); g.units.splice(g.units.indexOf(u), 1); }

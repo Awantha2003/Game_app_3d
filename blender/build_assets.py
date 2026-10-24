@@ -1496,6 +1496,7 @@ BUILDERS = [
     lambda: soldier("soldier_ghillie", tex_army_dpm, "#6a4630", "army", hat="boonie", paint=True, ghillie=True, weapon="svd"),
     lambda: weapon_model("wpn_svd", build_svd),
     lambda: weapon_model("wpn_lmg", build_lmg),
+    lambda: weapon_model("wpn_t56", build_t56),
     artillery,
     lambda: weapon_model("wpn_pistol", build_pistol),
     helicopter, arrow_boat,

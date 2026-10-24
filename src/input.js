@@ -155,7 +155,13 @@ export class Input {
       el.addEventListener('touchend', (e) => { off(); el.classList.remove('down'); e.preventDefault(); });
     };
     hold('.btn-fire', () => { this.fire = true; }, () => { this.fire = false; });
-    hold('.btn-aim', () => { this.aim = !this.aim; }, () => {});
+    const aimBtn = root.querySelector('.btn-aim');
+    hold('.btn-aim', () => { this.aim = !this.aim; aimBtn.classList.toggle('on', this.aim); }, () => {});
+    // small buttons send the same key as the keyboard
+    for (const el of root.querySelectorAll('[data-key]')) {
+      el.addEventListener('touchstart', (e) => { this.pressed.add(el.dataset.key); el.classList.add('down'); e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      el.addEventListener('touchend', (e) => { el.classList.remove('down'); e.preventDefault(); });
+    }
     hold('.btn-reload', () => this.pressed.add('KeyR'), () => {});
     hold('.btn-action', () => { this.touchAction = true; }, () => { this.touchAction = false; });
     hold('.btn-sprint', () => { this.sprintToggle = !this.sprintToggle; }, () => {});

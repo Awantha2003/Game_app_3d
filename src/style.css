@@ -348,3 +348,30 @@ body.nvg #nvg-overlay { display: block; }
 .coop-invite .coop-link { flex: 1; min-width: 0; padding: 8px; background: rgba(0, 0, 0, 0.35); color: inherit; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; font: 13px/1.2 monospace; }
 .coop-host-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
 .coop-host-controls select { padding: 6px; }
+
+/* ---- touch: extra buttons, portrait layout ---- */
+.tcol { position: absolute; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.tcol-left { left: 14px; bottom: 214px; }
+.tcol-right { right: 10px; top: 110px; }
+.tbtn.tsm { position: static; width: 54px !important; height: 34px !important; border-radius: 17px; font-size: 11px; letter-spacing: 0.06em; pointer-events: auto; }
+.btn-aim.on { background: rgba(224, 184, 74, 0.45); }
+.map-bar { display: flex; gap: 8px; }
+#map canvas { cursor: crosshair; touch-action: none; }
+.rotate-hint { display: none; }
+@media (orientation: portrait) and (max-width: 700px) {
+  #hud .squad, #hud .orders, #hud .stance-ind { display: none; }
+  #hud .radio { font-size: 13px; left: 12px; right: 12px; max-width: none; bottom: 250px; transform: none; }
+  #hud .obj-text { font-size: 14px; }
+  #hud .obj-sub, #hud .obj-mission { font-size: 11px; }
+  #hud .ammo-mag { font-size: 34px; }
+  #titlecard .tc-name { font-size: 26px; }
+  #titlecard .tc-sub { font-size: 10px; }
+  .tcol-right { top: 220px; gap: 6px; }
+  .tcol-left { bottom: 206px; gap: 6px; }
+  #hud .radio { top: 198px; bottom: auto; right: 76px; font-size: 12px; }
+  #hud .stealth { right: 66px; font-size: 11px; padding: 3px 8px; }
+  #titlecard { top: 36vh; }
+  .rotate-hint { display: block; position: absolute; left: 50%; top: 46%; transform: translateX(-50%); padding: 6px 12px; background: rgba(0, 0, 0, 0.55);
+    border-radius: 14px; font-size: 12px; white-space: nowrap; animation: hintfade 7s ease forwards; pointer-events: none; }
+  @keyframes hintfade { 0%, 75% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+}

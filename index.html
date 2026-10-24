@@ -43,6 +43,7 @@
     <div class="orders"></div>
     <div class="alarm-banner">⚠ ALARM ⚠</div>
     <div class="insert-skip">Press Space to skip</div>
+    <div class="rotate-hint">Turn your phone sideways for a wider view</div>
     <div class="scope">
       <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
         <defs><mask id="scope-mask"><rect x="-200" y="-200" width="560" height="490" fill="white" /><circle cx="80" cy="45" r="40" fill="black" /></mask></defs>
@@ -62,7 +63,10 @@
       <div class="binos-range"></div><div class="binos-hint">Look at hostiles to mark them · B to lower</div>
     </div>
   </div>
-  <div id="map" class="hidden"><canvas></canvas><div class="map-info"></div></div>
+  <div id="map" class="hidden">
+    <div class="map-bar"><button class="btn map-mode">Orders: Bravo team</button><button class="btn map-close">✕ Close map</button></div>
+    <canvas></canvas><div class="map-info"></div>
+  </div>
 
   <!-- touch controls -->
   <div id="touch" class="hidden">
@@ -75,6 +79,20 @@
     <button class="tbtn btn-action">E</button>
     <button class="tbtn btn-sprint">RUN</button>
     <button class="tbtn btn-pause">II</button>
+    <div class="tcol tcol-left">
+      <button class="tbtn tsm" data-key="Space">JUMP</button>
+      <button class="tbtn tsm" data-key="KeyC">CRCH</button>
+      <button class="tbtn tsm" data-key="KeyZ">PRONE</button>
+    </div>
+    <div class="tcol tcol-right">
+      <button class="tbtn tsm" data-key="KeyM">MAP</button>
+      <button class="tbtn tsm" data-key="KeyQ">WPN</button>
+      <button class="tbtn tsm" data-key="KeyG">GREN</button>
+      <button class="tbtn tsm" data-key="KeyB">BINO</button>
+      <button class="tbtn tsm" data-key="KeyT">SQUAD</button>
+      <button class="tbtn tsm" data-key="KeyH">MEDIC</button>
+      <button class="tbtn tsm" data-key="KeyN">NV</button>
+    </div>
   </div>
 
   <!-- opening cinematic -->
@@ -174,7 +192,7 @@
         </label>
       </div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · H call the medic · N night vision · Esc pause
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves)
       </div>
       <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn" data-act="prologue">Watch prologue</button></div>
     </div>
@@ -238,7 +256,7 @@
       <h2>Paused</h2>
       <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · H call the medic · N night vision · Esc pause
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves)
       </div>
     </div>
 

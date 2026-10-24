@@ -55,6 +55,33 @@ try {
     const cover = g.world.findCover(new T(wall.x + 2, wall.y1, wall.z - 3), threat, 12);
     out.cover = !!cover && !g.world.lineOfSight(new T(threat.x, g.world.height(threat.x, threat.z) + 1.4, threat.z), new T(cover.x, g.world.height(cover.x, cover.z) + 0.85, cover.z));
 
+    // jump
+    const ground = g.player.pos.y;
+    g.input.pressed.add('Space');
+    let top = 0;
+    for (let i = 0; i < 20; i++) { g.update(1 / 30); top = Math.max(top, g.player.pos.y - ground); }
+    out.jump = Math.round(top * 100) / 100;
+
+    // weapon pickups from fallen cadres
+    const gun = g.units.find((u) => u.team === 'ltte' && u.alive && u.weaponId === 'lmg') || g.units.find((u) => u.team === 'ltte' && u.alive);
+    gun.weaponId = 'lmg';
+    gun.damage(999, g.player);
+    out.dropped = g.pickups.length;
+    const pk = g.pickups[g.pickups.length - 1];
+    g.player.pos.set(pk.x + 0.5, g.player.pos.y, pk.z);
+    out.prompt = g.findInteraction()?.label || '';
+    g.pickUp(pk);
+    out.primaryAfterPickup = g.weapons[0].id;
+    out.oldDropped = g.pickups.some((k) => k.id === 't56');
+
+    // planning on the map: tap the centre to send Bravo team there
+    g.toggleMap(true);
+    const r = document.querySelector('#map canvas').getBoundingClientRect();
+    g.mapOrder({ clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 });
+    const moved = g.squadAllies().filter((a) => a.order === 'move');
+    out.mapOrder = moved.length > 0 && moved.every((a) => Math.hypot(a.orderPos.x, a.orderPos.z) < 6);
+    g.toggleMap(false);
+
     // loadout locked by rank, then unlocked
     g.profile.reset();
     g.profile.data.loadout = { primary: 'lmg', gear: 'pouch', optics: 'nvg' };
@@ -82,6 +109,11 @@ try {
   check(r.suppressed, 'fire near a cadre suppresses him');
   check(r.gunnerLmg, 'the support gunner carries the machine gun');
   check(r.cover, 'cover search finds a spot hidden from the threat');
+  check(r.jump > 0.5, `Space jumps when standing (${r.jump} m)`);
+  check(r.dropped > 0, 'a fallen cadre leaves his weapon on the ground');
+  check(/Take the Light machine gun/.test(r.prompt), `the pickup prompt names the weapon ("${r.prompt}")`);
+  check(r.primaryAfterPickup === 'lmg' && r.oldDropped, 'taking the machine gun swaps it in and drops the rifle');
+  check(r.mapOrder, 'tapping the map sends Bravo team to that spot');
   check(r.lockedPrimary === 't56' && r.lockedGrenades === 3, `locked loadout items fall back to standard issue (${r.lockedPrimary}, ${r.lockedGrenades} grenades)`);
   check(r.unlockedPrimary === 'lmg' && r.unlockedGrenades === 5 && r.lmgMag === 100, `Captain can take the LMG and grenade pouch (${r.unlockedPrimary}, ${r.unlockedGrenades} grenades, ${r.lmgMag} rounds)`);
   check(r.nvg, 'night-vision goggles toggle');
