@@ -498,6 +498,7 @@ class Game {
     this.applyLoadout();
     this.projectiles = [];
     this.pickups = [];
+    this.viaDone = false;
     this.jumpH = 0;
     this.jumpV = 0;
     this.mapMode = this.mapMode || 'bravo';
@@ -599,6 +600,9 @@ class Game {
       if (left <= 2) {
         for (const u of rest) {
           if (u.state === 'idle' || !u.lastSeen) { u.state = 'combat'; u.lastSeen = this.player.pos.clone(); }
+          // stragglers are marked and leave cover to close in, so nobody hides forever
+          if (!u.straggler) { u.straggler = true; u.marked = true; }
+          if (!u.visible && !u.sentry) u.lastSeen = this.nearestHuman(u.pos).pos.clone();
         }
       }
     } else if (o.type === 'interact') {
@@ -662,6 +666,11 @@ class Game {
     if (o.type === 'escort') {
       const waiting = this.units.find((u) => u.team === 'civ' && u.state === 'wait');
       if (waiting) return waiting.pos.clone().setY(waiting.pos.y + 2);
+      // lead the families through the gap first (e.g. the breach in a bund)
+      if (o.via && !this.viaDone) {
+        if (Math.hypot(p.x - o.via[0], p.z - o.via[1]) < 4) this.viaDone = true;
+        else return new THREE.Vector3(o.via[0], this.world.height(o.via[0], o.via[1]) + 2, o.via[1]);
+      }
       return new THREE.Vector3(o.zone[0], this.world.height(o.zone[0], o.zone[1]) + 2, o.zone[1]);
     }
     return null;

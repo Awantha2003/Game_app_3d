@@ -472,7 +472,7 @@ export const MISSIONS = [
       { type: 'interact', tag: 'breach', text: 'Set the breaching charge on the bund' },
       { type: 'clear', tag: 'bund', text: 'Clear the fighters at the breach' },
       { type: 'clear', tag: 'camp', text: 'Clear the fighters south of the families' },
-      { type: 'escort', zone: [-20, 95, 12], text: 'Lead the families through the breach to the army lines', reach: [-10, -52] },
+      { type: 'escort', zone: [-20, 95, 12], via: [-3, 7], text: 'Lead the families through the breach to the army lines', reach: [-10, -52] },
     ],
   },
 

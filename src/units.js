@@ -340,8 +340,14 @@ export class Unit {
       // follow the player while near them, otherwise head for the safe zone
       const pl = g.nearestHuman(this.pos);
       let tx = zx, tz = zz;
+      // pass through the gap first (the breach in the bund), then on to safety
+      const via = g.currentObjective()?.via;
+      if (via && !this.viaDone) {
+        if (Math.hypot(via[0] - this.pos.x, via[1] - this.pos.z) < 4) this.viaDone = true;
+        else { tx = via[0]; tz = via[1]; }
+      }
       const toZone = Math.hypot(zx - this.pos.x, zz - this.pos.z);
-      if (pl.alive && pl.pos.distanceTo(this.pos) > 9 && toZone > 30) { tx = pl.pos.x; tz = pl.pos.z; }
+      if (pl.alive && pl.pos.distanceTo(this.pos) > 9 && toZone > 30 && (!via || this.viaDone)) { tx = pl.pos.x; tz = pl.pos.z; }
       this.faceTowards(tx, tz, dt, 5);
       this.move(Math.sin(this.yaw), Math.cos(this.yaw), 3.6, dt);
       this.separate(dt);
@@ -503,9 +509,10 @@ export class Unit {
             }
             this.flankSide = 0;
           }
-          // fight from cover when there is some nearby
+          // fight from cover when there is some nearby (stragglers come out)
           this.coverTimer -= dt;
-          if (this.coverTimer <= 0 && !this.sentry) {
+          if (this.straggler) this.cover = null;
+          else if (this.coverTimer <= 0 && !this.sentry) {
             this.cover = g.world.findCover(this.pos, tgt.pos, 12);
             this.coverTimer = 3 + Math.random() * 2;
           }
