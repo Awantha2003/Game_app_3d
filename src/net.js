@@ -462,6 +462,19 @@ export class Net {
         if (this.role === 'host') { g.partnerGrenade(m, from); this.broadcast(m, from); } else g.fx.explosion(new THREE.Vector3(...m.p));
         break;
       case 'interact': if (this.role === 'host') g.partnerInteract(m, from); break;
+      case 'smoke':
+        g.addSmoke(new THREE.Vector3(...m.p), false);
+        if (this.role === 'host') this.broadcast(m, from);
+        break;
+      case 'support':
+        // a friend's radio call: the host carries it out
+        if (this.role === 'host' && g.state === 'playing') {
+          const sup = g.support;
+          if (sup.uses[m.id] > 0) { sup.uses[m.id]--; sup.ready[m.id] = g.time + 20; sup.execute(m.id, m.p ? new THREE.Vector3(...m.p) : null, g.partners.get(from) || g.player, true); }
+        }
+        break;
+      case 'supfx': if (this.role === 'guest') g.support.showFx(m); break;
+      case 'vdead': if (this.role === 'host') g.vehicles[m.i]?.destroy(); break;
       case 'dmg': if (this.role === 'guest' && g.player?.alive) { g.player.hp -= m.v; g.onPlayerHit(null); if (g.player.hp <= 0) g.player.die(null); } break;
       case 'dead': if (this.role === 'host') g.missionFailed(`${this.nameOf(from)} was killed in action.`); break;
       case 'end': if (this.role === 'guest') g.coopEnd(m); break;
@@ -487,7 +500,9 @@ export class Net {
     if (this.role === 'host') this.broadcast(this.snapshot());
     else {
       const p = g.player;
-      this.send({ t: 'me', p: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)], y: r2(p.yaw), pi: r2(p.pitch), s: STANCES.indexOf(p.stance), v: r2(p.speed || 0), hp: Math.round(p.hp) });
+      const me = { t: 'me', p: [r2(p.pos.x), r2(p.pos.y), r2(p.pos.z)], y: r2(p.yaw), pi: r2(p.pitch), s: STANCES.indexOf(p.stance), v: r2(p.speed || 0), hp: Math.round(p.hp) };
+      if (g.vehicle) me.vh = [g.vehicle.index, ...g.vehicle.pose()];
+      this.send(me);
     }
   }
 
@@ -498,13 +513,16 @@ export class Net {
     const units = [];
     for (const u of g.units) {
       units.push([u.nid, r2(u.pos.x), r2(u.pos.y), r2(u.pos.z), r2(u.yaw), r2(u.pitch), STANCES.indexOf(u.stance), u.alive ? 1 : 0,
-        u.team === 'ltte' ? 1 : u.team === 'civ' ? 2 : 0, u.tag || '', u.state === 'wait' ? 1 : 0, r2(u.speed || 0), u.marked ? 1 : 0, Math.round(u.hp)]);
+        u.team === 'ltte' ? 1 : u.team === 'civ' ? 2 : 0, u.tag || '', u.state === 'wait' ? 1 : 0, r2(u.speed || 0), u.marked ? 1 : 0, Math.round(u.hp),
+        (u.vehicle ? 1 : 0) + (u.downed ? 2 : 0)]);
     }
+    // vehicles: pose, hull points, wreck or not, who drives it
+    const veh = g.vehicles.map((v) => [...v.pose(), Math.round(v.hp), v.alive ? 1 : 0, v.driverNid === 'me' ? this.myNid : v.driverNid ?? '']);
     return {
       t: 'snap', units, obj: g.objIndex, sub: document.querySelector('.obj-sub')?.textContent || '',
       civ: [g.civSafe, g.civTotal], alarms: g.world.alarms.map((a) => (a.disabled ? 2 : a.triggered ? 1 : 0)),
       targets: g.world.targets.map((t) => (t.blown ? 2 : t.done ? 1 : 0)),
-      alert: g.alertLevel > 0 ? 1 : 0,
+      alert: g.alertLevel > 0 ? 1 : 0, veh,
     };
   }
 
@@ -517,6 +535,24 @@ export class Net {
     u.stance = STANCES[m.s] || 'stand';
     u.speed = m.v;
     u.hp = m.hp;
+    // the partner's vehicle: they move it, the host keeps its hull points
+    const g = this.game;
+    for (const v of g.vehicles) {
+      if (m.vh && m.vh[0] === v.index) {
+        if (v.driverNid != null && v.driverNid !== nid) continue;
+        v.driverNid = nid;
+        v.driver = u;
+        v.netPose = m.vh.slice(1);
+        v.occupants.add(u);
+        u.vehicle = v;
+      } else if (v.driverNid === nid) {
+        v.driverNid = null;
+        v.driver = null;
+        v.occupants.delete(u);
+        u.vehicle = null;
+        u.obj.visible = true;
+      }
+    }
   }
 
   // ------------------------------------------------------------- guest side
@@ -526,7 +562,7 @@ export class Net {
     if (!g.world || !g.player) return;
     const seen = new Set();
     for (const a of m.units) {
-      const [nid, x, y, z, yaw, pitch, s, alive, team, tag, wait, speed, marked, hp] = a;
+      const [nid, x, y, z, yaw, pitch, s, alive, team, tag, wait, speed, marked, hp, flags = 0] = a;
       seen.add(nid);
       let u = g.unitByNid(nid);
       if (!u) u = g.spawnRemote(nid, team === 1 ? 'ltte' : team === 2 ? 'civ' : 'army', x, z, tag);
@@ -538,6 +574,7 @@ export class Net {
       u.speed = speed;
       u.marked = u.marked || !!marked;
       if (u.remote) u.hp = hp;
+      if (!u.remote && !u.isPlayer) { u.obj.visible = !(flags & 1); u.downed = !!(flags & 2); }
       if (u.team === 'civ') u.state = wait ? 'wait' : 'flee';
       if (u.alive && !alive) { u.alive = false; u.hp = 0; u.deadTime = 0; if (u.team === 'ltte') { g.dropWeapon(u); g.killfeed('LTTE cadre neutralised'); } }
     }
@@ -555,6 +592,27 @@ export class Net {
       if (s === 2 && !t.blown) g.detonate(t, true);
     });
     g.alertLevel = m.alert ? 8 : 0;
+    (m.veh || []).forEach((row, i) => {
+      const v = g.vehicles[i];
+      if (!v) return;
+      const [x, y, z, yaw, pitch, roll, spin, hp, alive, driver] = row;
+      v.hp = hp;
+      if (v.alive && !alive) v.destroy();
+      const d = driver === '' ? null : driver;
+      if (v === g.vehicle) {
+        // someone else got to the controls first
+        if (d != null && d !== this.myNid) { g.toast('Someone else is driving that'); g.exitVehicle(true); }
+        return;
+      }
+      v.netPose = [x, y, z, yaw, pitch, roll, spin];
+      v.driverNid = d;
+      // the soldier of whoever drives it rides inside
+      for (const u of g.partners.values()) {
+        const inIt = d === u.nid;
+        if (inIt && u.vehicle !== v) { u.vehicle = v; v.occupants.add(u); v.driver = u; }
+        if (!inIt && u.vehicle === v) { u.vehicle = null; v.occupants.delete(u); u.obj.visible = true; }
+      }
+    });
   }
 }
 

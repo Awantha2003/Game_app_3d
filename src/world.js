@@ -86,6 +86,8 @@ export class World {
     this.spawns = [];
     this.targets = [];
     this.supplies = [];
+    this.smokes = [];
+    this.vehicles = [];
     this.alarms = [];
     this.towers = [];
     this.units = [];
@@ -512,7 +514,7 @@ export class World {
   }
 
   blocked(x, z, margin) {
-    for (const c of this.colliders) if (this.circleOverlap(c, x, z, margin)) return true;
+    for (const c of this.colliders) if (!c.off && this.circleOverlap(c, x, z, margin)) return true;
     return false;
   }
 
@@ -805,7 +807,7 @@ export class World {
   // Push a circle (x, z, radius) at height y out of all colliders. Mutates pos.
   resolve(pos, radius) {
     for (const c of this.colliders) {
-      if (c.y1 < pos.y + 0.45 || c.y0 > pos.y + 1.6) continue;
+      if (c.off || c.y1 < pos.y + 0.45 || c.y0 > pos.y + 1.6) continue;
       if (c.t === 'c') {
         const dx = pos.x - c.x, dz = pos.z - c.z;
         const d = Math.hypot(dx, dz), min = c.r + radius;
@@ -837,13 +839,20 @@ export class World {
     let best = { t: maxT, kind: null };
 
     for (const c of this.colliders) {
+      if (c.vehicle) continue; // vehicles are tested below
       const t = c.t === 'c' ? rayCyl(o, d, c) : rayBox(o, d, c);
       if (t !== null && t < best.t) best = { t, kind: c.ref ? 'target' : 'prop', target: c.ref };
     }
 
     if (withUnits) {
+      // vehicles: an oriented box around the hull (the shooter's own vehicle is skipped)
+      for (const v of this.vehicles) {
+        if (!v.alive || v === ignore || (ignore && v.occupants.has(ignore))) continue;
+        const t = rayBox(o, d, v.box);
+        if (t !== null && t < best.t) best = { t, kind: 'vehicle', vehicle: v };
+      }
       for (const u of this.units) {
-        if (!u.alive || u === ignore) continue;
+        if (!u.alive || u === ignore || u.vehicle) continue;
         const p = u.pos, bh = u.bodyHeight;
         const th = raySphere(o, d, p.x, p.y + bh + 0.14, p.z, 0.15);
         if (th !== null && th < best.t) best = { t: th, kind: 'unit', unit: u, head: true };
@@ -881,6 +890,17 @@ export class World {
     if (!best.kind) return null;
     best.point = new THREE.Vector3(o.x + d.x * best.t, o.y + d.y * best.t, o.z + d.z * best.t);
     return best;
+  }
+
+  // does the line from a to b pass through a smoke screen?
+  smokeBlocks(a, b) {
+    for (const s of this.smokes) {
+      const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, len2 = dx * dx + dy * dy + dz * dz || 1;
+      const k = Math.max(0, Math.min(1, ((s.x - a.x) * dx + (s.y - a.y) * dy + (s.z - a.z) * dz) / len2));
+      const px = a.x + dx * k - s.x, py = a.y + dy * k - s.y, pz = a.z + dz * k - s.z;
+      if (px * px + py * py * 2 + pz * pz < s.r * s.r) return true;
+    }
+    return false;
   }
 
   lineOfSight(a, b) {

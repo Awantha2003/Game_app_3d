@@ -34,6 +34,9 @@
       <div class="hp"><div class="hp-label">HEALTH</div><div class="hp-bar"><div></div></div></div>
     </div>
     <div class="ammo"><span class="ammo-mag">30</span><span class="ammo-res">/ 240</span><div class="ammo-name">T-56</div><div class="ammo-gren"></div></div>
+    <div class="vhud"><div class="vh-name"></div><div class="vh-row"><span>HULL</span><div class="vh-bar vh-hp"><div></div></div></div>
+      <div class="vh-row"><span>GUN</span><div class="vh-bar vh-heat"><div></div></div></div><div class="vh-info"></div><div class="vh-warn"></div></div>
+    <div class="zoom-level"></div>
     <div class="vignette"></div>
     <div class="squad"></div>
     <div class="detect"></div>
@@ -59,7 +62,7 @@
         <g stroke="#000" stroke-width="0.18"><line x1="78.5" y1="51" x2="81.5" y2="51" /><line x1="79" y1="56" x2="81" y2="56" /><line x1="79.3" y1="61" x2="80.7" y2="61" /></g>
         <circle cx="80" cy="45" r="0.35" fill="#c0301a" />
       </svg>
-      <div class="breath"><div></div></div><div class="scope-hint">Hold SHIFT to steady your breath</div>
+      <div class="breath"><div></div></div><div class="scope-hint">Hold SHIFT to steady your breath · mouse wheel or + / − to zoom</div>
     </div>
     <div class="binos">
       <svg viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice">
@@ -87,14 +90,20 @@
     <button class="tbtn btn-sprint">RUN</button>
     <button class="tbtn btn-pause">II</button>
     <div class="tcol tcol-left">
-      <button class="tbtn tsm" data-key="Space">JUMP</button>
-      <button class="tbtn tsm" data-key="KeyC">CRCH</button>
-      <button class="tbtn tsm" data-key="KeyZ">PRONE</button>
+      <button class="tbtn tsm foot-only" data-key="Space">JUMP</button>
+      <button class="tbtn tsm foot-only" data-key="KeyC">CRCH</button>
+      <button class="tbtn tsm foot-only" data-key="KeyZ">PRONE</button>
+      <button class="tbtn tsm heli-only" data-hold="Space">UP ▲</button>
+      <button class="tbtn tsm heli-only" data-hold="KeyC">DOWN ▼</button>
     </div>
+    <div class="zoom-ctl"><button class="tbtn tsm" data-key="Equal">ZOOM +</button><button class="tbtn tsm" data-key="Minus">ZOOM −</button></div>
     <div class="tcol tcol-right">
       <button class="tbtn tsm" data-key="KeyM">MAP</button>
-      <button class="tbtn tsm" data-key="KeyQ">WPN</button>
+      <button class="tbtn tsm foot-only" data-key="KeyQ">WPN</button>
       <button class="tbtn tsm" data-key="KeyG">GREN</button>
+      <button class="tbtn tsm foot-only" data-key="KeyY">⇄ BOMB</button>
+      <button class="tbtn tsm det-only" data-key="KeyU">DET</button>
+      <button class="tbtn tsm" data-key="KeyL">CALL</button>
       <button class="tbtn tsm" data-key="KeyB">BINO</button>
       <button class="tbtn tsm" data-key="KeyT">SQUAD</button>
       <button class="tbtn tsm" data-key="KeyH">MEDIC</button>
@@ -103,6 +112,9 @@
       <button class="tbtn tsm coop-only btn-mic">MIC</button>
     </div>
   </div>
+
+  <!-- tappable HUD parts that sit above the touch zones -->
+  <div id="hud-top"><div class="wbar"></div><div class="support hidden"></div></div>
 
   <!-- opening cinematic -->
   <div id="prologue" class="hidden"></div>
@@ -201,7 +213,7 @@
         </label>
       </div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD (wheel or + / − zooms the scope) · 4 RPG-7 · G throw / place · Y frag, smoke or C4 · U detonate C4 · F board or leave a vehicle · L radio support (reinforcements, artillery, air strike, supplies) · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
       </div>
       <div class="row"><button class="btn" data-act="menu">Back</button><button class="btn" data-act="prologue">Watch prologue</button></div>
     </div>
@@ -286,7 +298,7 @@
       <h2>Paused</h2>
       <div class="row col"><button class="btn primary" data-act="resume">Resume</button><button class="btn" data-act="restart">Restart mission</button><button class="btn" data-act="menu">Quit to menu</button></div>
       <div class="controls">
-        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD · G grenade · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
+        <b>Controls</b> WASD move · Mouse look · Left click fire · Right click aim / scope · Shift sprint (hold breath when scoped) · C crouch · Z prone · Space stand · 1 T-56 · 2 suppressed pistol · 3 SVD (wheel or + / − zooms the scope) · 4 RPG-7 · G throw / place · Y frag, smoke or C4 · U detonate C4 · F board or leave a vehicle · L radio support (reinforcements, artillery, air strike, supplies) · B binoculars · M map · E interact · R reload · T squad follow/hold · V send Bravo team · X weapons free/tight · Q next weapon · Space jump · H call the medic · N night vision · Esc pause · M map (click it to plan moves) · co-op: Enter chat, K microphone
       </div>
     </div>
 

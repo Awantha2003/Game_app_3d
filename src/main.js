@@ -16,19 +16,27 @@ import {
   CHARACTERS, CLOSING, HISTORY_TIMELINE, HUMAN_COST, LOADOUT, MEDALS, PROLOGUE, RANKS, SOURCES, SQUAD_EPILOGUE, STORY, nextRank, rankIndex,
 } from './story.js';
 import { Unit } from './units.js';
+import { placeVehicles } from './vehicles.js';
+import { Support } from './support.js';
 import { World } from './world.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 
 // The player's weapons. Noise is how far (m) the shot is heard.
-// which weapon slot a weapon goes into (1 primary, 2 pistol, 3 marksman)
-const SLOT = { t56: 0, lmg: 0, pistol: 1, svd: 2 };
+// which weapon slot a weapon goes into (1 primary, 2 pistol, 3 marksman, 4 launcher)
+const SLOT = { t56: 0, lmg: 0, pistol: 1, svd: 2, rpg: 3 };
+// scope and binocular magnifications (field of view = 70° / zoom)
+const SCOPE_ZOOM = [4, 8, 12];
+const BINO_ZOOM = [4, 8];
+// what G throws or places
+const THROWABLES = { frag: 'Frag grenade', smoke: 'Smoke grenade', c4: 'C4 charge' };
 
 const WEAPONS = [
   { id: 'lmg', name: 'Light machine gun', mag: 100, reserve: 300, interval: 0.085, auto: true, body: 40, head: 120, spreadHip: 0.026, spreadAim: 0.007, recoil: 0.011, noise: 90, reload: 5.2, heavy: true },
   { id: 't56', name: 'T-56 rifle', mag: 30, reserve: 240, interval: 0.1, auto: true, body: 36, head: 120, spreadHip: 0.012, spreadAim: 0.003, recoil: 0.009, noise: 70, reload: 2.2 },
   { id: 'pistol', name: 'Pistol · suppressed', mag: 8, reserve: 48, interval: 0.25, auto: false, body: 34, head: 110, spreadHip: 0.01, spreadAim: 0.004, recoil: 0.014, noise: 9, reload: 1.6, suppressed: true },
   { id: 'svd', name: 'SVD Dragunov', mag: 10, reserve: 40, interval: 0.45, auto: false, body: 110, head: 200, spreadHip: 0.03, spreadAim: 0.0004, recoil: 0.03, noise: 130, reload: 2.8, scope: true },
+  { id: 'rpg', name: 'RPG-7 launcher', mag: 1, reserve: 4, interval: 0.8, auto: false, body: 0, head: 0, spreadHip: 0.02, spreadAim: 0.004, recoil: 0.06, noise: 150, reload: 3.2, rocket: true },
 ];
 
 class Game {
@@ -57,11 +65,13 @@ class Game {
     this.state = 'loading';
     this.time = 0;
     this.units = [];
+    this.vehicles = [];
     this.profile = new Profile(MISSIONS.map((m) => m.id));
     this.difficulty = this.profile.settings.difficulty;
     this.audio.setVolume(this.profile.settings.volume);
     this.radio = new Radio($('.radio'), this.audio);
     this.prologue = new Prologue(this);
+    this.support = new Support(this);
     this.cinematic = null;
     this.flags = {};
     this.resize();
@@ -207,7 +217,11 @@ class Game {
     const tc = $('.btn-chat'), tm = $('.btn-mic');
     tc.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.openChat(); }, { passive: false });
     tm.addEventListener('touchstart', (e) => { e.preventDefault(); e.stopPropagation(); this.net.setMic(!this.net.micOn); }, { passive: false });
-    $('.map-mode').addEventListener('click', () => { this.mapMode = this.mapMode === 'all' ? 'bravo' : 'all'; this.drawMap(); });
+    $('.wbar').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-slot]');
+      if (b && this.state === 'playing' && !this.vehicle) this.switchWeapon(Number(b.dataset.slot));
+    });
+    $('.map-mode').addEventListener('click', () => { this.mapMode = { bravo: 'all', all: 'strike', strike: 'bravo' }[this.mapMode] || 'bravo'; this.drawMap(); });
     $('.map-close').addEventListener('click', () => this.toggleMap(false));
     const bindRange = (id, out, key, fmt) => {
       const el = $(id);
@@ -487,7 +501,7 @@ class Game {
     let idx = 10;
     for (const s of this.world.spawns) {
       // cadres carry T-56 rifles; sentries an SVD and every sixth a machine gun
-      const wid = s.team !== 'ltte' ? null : s.sentry ? 'svd' : idx % 6 === 0 ? 'lmg' : 't56';
+      const wid = s.team !== 'ltte' ? null : s.sentry ? 'svd' : idx % 6 === 0 ? 'lmg' : idx % 9 === 4 ? 'rpg' : 't56';
       const u = new Unit(this, s.team, s.x, s.z, {
         tag: s.tag, index: idx++, yaw: s.team === 'ltte' ? Math.random() * 6.28 : Math.PI, patrol: s.patrol, sentry: s.sentry,
         weapon: wid && wid !== 't56' ? `wpn_${wid}` : null, role: wid === 'lmg' ? 'gunner' : undefined,
@@ -505,6 +519,12 @@ class Game {
       this.net.roster.filter((r) => r.nid !== this.net.myNid).forEach((r) => this.addPartner(r.nid, r.name));
     }
     this.world.units = this.units;
+    this.vehicles = placeVehicles(this);
+    this.vehicle = null;
+    this.support.clear();
+    this.support.reset();
+    this.strikeMark = null;
+    document.body.classList.remove('invehicle');
     this.escortZone = m.objectives.find((o) => o.type === 'escort')?.zone || [0, 0, 10];
     this.civTotal = this.units.filter((u) => u.team === 'civ').length;
     this.civSafe = 0;
@@ -524,6 +544,8 @@ class Game {
     this.jumpV = 0;
     this.mapMode = this.mapMode || 'bravo';
     this.binos = false;
+    this.scopeZoom = 1;
+    this.binoZoom = 1;
     this.breath = 1;
     this.swayT = 0;
     this.stepDist = 0;
@@ -557,7 +579,13 @@ class Game {
 
   clearMission() {
     this.audio.siren(false);
+    for (const v of this.vehicles || []) v.remove();
+    this.vehicles = [];
+    this.vehicle = null;
+    this.audio.engine(null);
     for (const g of this.projectiles || []) this.scene.remove(g.obj);
+    for (const c of this.c4Placed || []) c.obj.parent?.remove(c.obj);
+    this.c4Placed = [];
     this.projectiles = [];
     this.insertion?.finish();
     this.insertion = null;
@@ -825,6 +853,7 @@ class Game {
       return;
     }
     if (u.team === 'civ') { this.missionFailed('A civilian was killed. Protecting civilians is your first duty.'); return; }
+    if (u.team === 'army') this.killfeed(`${u.name || 'A soldier'} was killed in action`);
     if (u.team === 'ltte') {
       this.dropWeapon(u);
       this.killfeed('LTTE cadre neutralised');
@@ -880,6 +909,27 @@ class Game {
       if (patient.isPlayer) this.medicCalled = false;
       this.toast(`${medic.name} treated ${patient.isPlayer ? 'you' : patient.name} · ${medic.kits} dressings left`);
     }
+  }
+
+  onAllyDown(u) {
+    const other = this.squadAllies().find((a) => a !== u && !a.downed);
+    const medic = this.squadAllies().find((a) => a.role === 'medic' && !a.downed && a.kits > 0);
+    this.killfeed(`${u.name} is down`);
+    this.radio.say([[this.speakerKey(other || u), `Man down! ${u.name} is hit!`]].concat(medic && medic !== u ? [[this.speakerKey(medic), 'I\'m on him — cover me!']] : []));
+    if (!medic) this.toast(`${u.name} is down — hold E next to him to patch him up`, true);
+  }
+
+  onAllyRevived(u, by) {
+    this.toast(`${u.name} is back on his feet${by && by !== this.player ? ` (${by.name})` : ''}`);
+  }
+
+  // the player patches up a downed soldier (in co-op the host does it)
+  revive(u) {
+    if (this.net.active && this.net.role === 'guest') { this.net.send({ t: 'interact', kind: 'revive', nid: u.nid }); u.downed = false; return; }
+    u.downed = false;
+    u.hp = Math.max(u.hp, u.maxHp * 0.45);
+    u.stance = 'crouch';
+    this.onAllyRevived(u, this.player);
   }
 
   onPlayerHit(from) {
@@ -960,8 +1010,10 @@ class Game {
       rifle.parent.add(o);
       return o;
     };
-    this.weaponObjs = { t56: rifle, lmg: attach('wpn_lmg'), svd: attach('wpn_svd'), pistol: attach('wpn_pistol') };
+    this.weaponObjs = { t56: rifle, lmg: attach('wpn_lmg'), svd: attach('wpn_svd'), pistol: attach('wpn_pistol'), rpg: attach('wpn_rpg') };
     this.weaponObjs.pistol.position.set(-0.26, -0.3, 0.17);
+    this.weaponObjs.rpg.position.y += 0.08;
+    this.weaponObjs.rpg.position.x -= 0.06;
     this.showWeapon();
   }
 
@@ -981,13 +1033,109 @@ class Game {
     this.binos = false;
     this.showWeapon();
     this.audio.click();
+    this.renderWeaponBar();
+  }
+
+  // the four weapon slots along the bottom of the screen; tap or click one to change
+  renderWeaponBar() {
+    const el = $('.wbar');
+    if (!el || !this.weapons) return;
+    el.innerHTML = this.weapons.map((w, i) => {
+      const st = i === this.wi ? { ammo: this.ammo, reserve: this.reserve } : this.wstate[i];
+      return `<button class="wslot${i === this.wi ? ' on' : ''}" data-slot="${i}"><b>${i + 1}</b> ${w.name.replace(/ ·.*/, '')}<small>${st.ammo} / ${st.reserve}</small></button>`;
+    }).join('');
+    this.wbarKey = `${this.wi}:${this.ammo}:${this.reserve}:${this.weapons.map((w) => w.id).join()}`;
+  }
+
+  // ------------------------------------------------------------ explosives
+
+  cycleThrowable() {
+    const kinds = Object.keys(THROWABLES);
+    for (let k = 1; k <= kinds.length; k++) {
+      const next = kinds[(kinds.indexOf(this.throwType) + k) % kinds.length];
+      if (this.explosives[next] > 0 || k === kinds.length) { this.throwType = next; break; }
+    }
+    this.toast(`${THROWABLES[this.throwType]} ready (${this.explosives[this.throwType]})`);
+    this.audio.click();
+  }
+
+  useThrowable() {
+    const kind = this.throwType;
+    if (this.explosives[kind] <= 0) { this.toast(`No ${THROWABLES[kind].toLowerCase()}s left — Y to switch`); return; }
+    this.explosives[kind]--;
+    if (kind === 'c4') { this.placeC4(); return; }
+    const p = this.player, d = new THREE.Vector3();
+    this.camera.getWorldDirection(d);
+    const pos = p.pos.clone().add(new THREE.Vector3(0, p.eyeHeight, 0)).addScaledVector(d, 0.6);
+    const vel = d.multiplyScalar(15).add(new THREE.Vector3(0, 4, 0));
+    const obj = models[kind === 'smoke' ? 'smoke_grenade' : 'grenade'].clone(true);
+    obj.scale.setScalar(1.6);
+    this.scene.add(obj);
+    this.projectiles.push({ kind, obj, pos, vel, fuse: kind === 'smoke' ? 1.6 : 3 });
+    this.toast(kind === 'smoke' ? 'Smoke out!' : 'Grenade out!');
+  }
+
+  get grenades() { return this.explosives?.frag ?? 0; }
+
+  set grenades(n) { if (this.explosives) this.explosives.frag = n; }
+
+  placeC4() {
+    const p = this.player, f = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    const x = p.pos.x + f.x * 0.7, z = p.pos.z + f.z * 0.7;
+    const obj = models.c4.clone(true);
+    obj.position.set(x, this.world.height(x, z) + 0.02, z);
+    obj.rotation.y = this.yaw;
+    obj.scale.setScalar(1.5);
+    this.world.group.add(obj);
+    this.c4Placed.push({ obj, pos: obj.position.clone() });
+    document.body.classList.add('c4armed');
+    this.toast(`C4 placed (${this.c4Placed.length}) — press ${this.input.touch ? 'DET' : 'U'} to detonate from a safe distance`);
+    this.audio.click();
+  }
+
+  detonateC4() {
+    if (!this.c4Placed.length) { this.toast('No charges placed'); return; }
+    this.audio.click();
+    for (const c of this.c4Placed) {
+      this.world.group.remove(c.obj);
+      this.explode(c.pos.clone().setY(c.pos.y + 0.3), 8.5, 320, this.player);
+    }
+    this.c4Placed = [];
+    document.body.classList.remove('c4armed');
+  }
+
+  // smoke blocks sight lines for both sides for about 25 seconds
+  addSmoke(pos, send = true) {
+    this.fx.smokeCloud(pos, 24);
+    this.world.smokes.push({ x: pos.x, y: pos.y + 1.5, z: pos.z, r: 5.5, t: 25 });
+    if (send && this.net.active) this.net.send({ t: 'smoke', p: pos.toArray().map((v) => Math.round(v * 10) / 10) });
+  }
+
+  fireRocket(from, dir, source, opts = {}) {
+    if (!this.rocketMesh) {
+      const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: '#4b5230', roughness: 0.6 });
+      const body = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 8).rotateX(Math.PI / 2), m);
+      const nose = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.3, 8).rotateX(Math.PI / 2), m);
+      nose.position.z = 0.38;
+      g.add(body, nose);
+      this.rocketMesh = g;
+    }
+    const obj = this.rocketMesh.clone();
+    this.scene.add(obj);
+    this.projectiles.push({
+      kind: opts.bomb ? 'bomb' : 'rocket', obj, pos: from.clone(), vel: opts.vel || dir.clone().multiplyScalar(opts.speed || 75),
+      fuse: 1, life: opts.bomb ? 12 : 4, r: opts.r || 6.5, dmg: opts.dmg || 260, source, ignore: opts.ignore || source,
+    });
+    if (opts.bomb) obj.scale.setScalar(3);
   }
 
   resupply() {
     this.wstate[this.wi] = { ammo: this.ammo, reserve: this.reserve };
-    this.weapons.forEach((w, i) => { this.wstate[i].reserve = w.reserve; });
-    this.reserve = this.W.reserve;
+    this.weapons.forEach((w, i) => { this.wstate[i].reserve = Math.max(this.wstate[i].reserve, w.reserve); });
+    this.reserve = this.wstate[this.wi].reserve;
     this.grenades = Math.max(this.grenades, this.maxGrenades);
+    this.explosives.smoke = Math.max(this.explosives.smoke, 2);
+    this.explosives.c4 = Math.max(this.explosives.c4, 2);
     // the crate's first-aid kit
     this.player.hp = Math.max(this.player.hp, 80);
     for (const a of this.squadAllies()) if (a.role === 'medic') a.kits = Math.max(a.kits, 3);
@@ -998,12 +1146,17 @@ class Game {
     const lo = this.loadoutChoice();
     const mags = lo.gear === 'mags' ? 1.5 : 1;
     const byId = (id) => ({ ...WEAPONS.find((w) => w.id === id) });
-    this.weapons = [byId(lo.primary), byId('pistol'), byId('svd')].map((w) => ({ ...w, reserve: Math.round(w.reserve * mags) }));
+    this.weapons = [byId(lo.primary), byId('pistol'), byId('svd'), byId('rpg')].map((w) => ({ ...w, reserve: Math.round(w.reserve * mags) }));
     this.wstate = this.weapons.map((w) => ({ ammo: w.mag, reserve: w.reserve }));
     this.ammo = this.weapons[0].mag;
     this.reserve = this.weapons[0].reserve;
     this.maxGrenades = lo.gear === 'pouch' ? 5 : 3;
-    this.grenades = this.maxGrenades;
+    this.explosives = { frag: this.maxGrenades, smoke: 2, c4: 2 };
+    this.throwType = 'frag';
+    this.c4Placed = [];
+    document.body.classList.remove('c4armed');
+    this.wbarKey = null;
+    this.renderWeaponBar();
     this.hasNVG = !!this.mission.night || lo.optics === 'nvg';
     this.setNVG(false);
   }
@@ -1031,7 +1184,7 @@ class Game {
       return `<button class="lo-item${on ? ' on' : ''}" data-slot="${slot}" data-item="${it.id}"${ok ? '' : ' disabled'}>
         <b>${it.name}</b><small>${ok ? it.desc : `Unlocks at ${rank.name}`}</small></button>`;
     }).join('')}</div>`).join('')
-      + '<p class="note">Always carried: suppressed pistol (2), SVD sniper rifle (3), binoculars (B).</p>';
+      + '<p class="note">Always carried: suppressed pistol (2), SVD sniper rifle (3), RPG-7 launcher (4), binoculars (B), smoke grenades and C4 charges (Y to switch, G to use).</p>';
     this.show('loadout');
     this.focusFirst();
   }
@@ -1049,7 +1202,20 @@ class Game {
   }
 
   isScoped() {
-    return this.W.scope === true && this.input.aim && this.reloading <= 0 && this.player.alive && !this.binos;
+    return this.W.scope === true && this.input.aim && this.reloading <= 0 && this.player.alive && !this.binos && !this.vehicle;
+  }
+
+  // mouse wheel, + / - keys or the phone's + / - buttons change the optic's zoom
+  changeZoom(dir) {
+    const binos = this.binos, list = binos ? BINO_ZOOM : SCOPE_ZOOM, key = binos ? 'binoZoom' : 'scopeZoom';
+    const i = THREE.MathUtils.clamp(this[key] + dir, 0, list.length - 1);
+    if (i === this[key]) return;
+    this[key] = i;
+    this.audio.click();
+  }
+
+  get opticZoom() {
+    return this.binos ? BINO_ZOOM[this.binoZoom] : SCOPE_ZOOM[this.scopeZoom];
   }
 
   // ------------------------------------------------------------ player
@@ -1057,6 +1223,8 @@ class Game {
   updatePlayer(dt) {
     const inp = this.input, p = this.player;
     if (!p.alive) { p.update(dt); p.sync(dt); return; }
+    if (this.vehicle) { this.updateVehicle(dt); return; }
+    if (inp.hit('KeyF')) { const v = this.nearestVehicle(); if (v) this.enterVehicle(v); }
 
     const look = inp.consumeLook();
     const zoom = this.camera.fov / 70;
@@ -1111,12 +1279,23 @@ class Game {
     if (this.time - this.lastPlayerHit > 5 && p.hp < 60) p.hp = Math.min(60, p.hp + 9 * dt);
     if (inp.hit('KeyH')) this.callMedic();
 
+    // support menu: while it is open the number keys call support
+    if (inp.hit('KeyL')) this.support.toggle();
+    if (this.support.open) this.support.keys(inp);
     // weapons
     if (inp.hit('Digit1')) this.switchWeapon(0);
     if (inp.hit('Digit2')) this.switchWeapon(1);
     if (inp.hit('Digit3')) this.switchWeapon(2);
+    if (inp.hit('Digit4')) this.switchWeapon(3);
     const wheel = inp.consumeWheel();
-    if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : this.weapons.length - 1)) % this.weapons.length);
+    const optic = scoped || this.binos;
+    if (optic) {
+      if (wheel) this.changeZoom(wheel > 0 ? -1 : 1);
+    } else if (wheel) this.switchWeapon((this.wi + (wheel > 0 ? 1 : this.weapons.length - 1)) % this.weapons.length);
+    if (inp.hit('Equal') || inp.hit('NumpadAdd')) this.changeZoom(1);
+    if (inp.hit('Minus') || inp.hit('NumpadSubtract')) this.changeZoom(-1);
+    if (inp.hit('KeyY')) this.cycleThrowable();
+    if (inp.hit('KeyU')) this.detonateC4();
     if (inp.hit('KeyN')) this.toggleNVG();
     if (inp.hit('KeyQ')) this.switchWeapon((this.wi + 1) % this.weapons.length);
     if (this.net.active) {
@@ -1124,7 +1303,7 @@ class Game {
       if (inp.hit('KeyK')) this.net.setMic(!this.net.micOn);
     }
     if (inp.hit('KeyB')) { this.binos = !this.binos; this.audio.click(); }
-    if (inp.hit('KeyG') && this.grenades > 0 && !this.binos) this.throwGrenade();
+    if (inp.hit('KeyG') && !this.binos) this.useThrowable();
 
     const W = this.W;
     if ((inp.hit('KeyR') || (this.ammo === 0 && inp.fire)) && this.reloading <= 0 && this.ammo < W.mag && this.reserve > 0) {
@@ -1176,6 +1355,7 @@ class Game {
     this.ammo--;
     this.shots++;
     this.fireCooldown = W.interval;
+    if (W.rocket) { this.shootRocket(); return; }
     const moving = (p.speed || 0) > 0.5;
     const stanceMul = p.stance === 'prone' ? 0.5 : p.stance === 'crouch' ? 0.7 : 1;
     const spread = ((this.input.aim ? W.spreadAim : W.spreadHip) + (moving ? 0.012 : 0) + this.bloom) * stanceMul;
@@ -1207,55 +1387,362 @@ class Game {
       this.net.send(guest ? { t: 'shot', a: v(muzzle), b: v(end), noise: W.noise, quiet: !!W.suppressed } : { t: 'fx', a: v(muzzle), b: v(end), c: 0xfff2a0 });
     }
     this.suppress(end, W.id === 'lmg' ? 4 : 2.5, W.id === 'lmg' ? 2.5 : 1.2);
-    if (guest && res?.kind === 'unit' && res.unit.team !== 'army') {
-      // the host owns every unit: report the hit and let it apply the damage
-      const u = res.unit, aimed = this.world.raycast(origin, aimDir, 450, p)?.unit === u;
-      this.net.send({ t: 'hit', nid: u.nid, dmg: res.head ? W.head : W.body, aimed });
-      if (u.team === 'civ') { this.toast('HOLD FIRE — civilians!', true); this.civIncidents++; this.storyEvent('civilianWarning'); }
-      else { this.hits++; this.fx.hitPuff(res.point); this.flashHitmarker(false); }
-    } else if (res?.kind === 'unit') {
-      const u = res.unit;
-      if (u.team === 'army') {
-        this.toast('Check your fire — friendly!');
-      } else if (u.team === 'civ') {
-        // only shots aimed straight at a civilian hurt them; stray rounds are a warning
-        const aimed = this.world.raycast(origin, aimDir, 450, p);
-        if (aimed?.unit === u) u.damage(40, p);
-        if (u.alive) this.toast('HOLD FIRE — civilians!', true);
-        this.civIncidents++;
-        this.storyEvent('civilianWarning');
-      } else {
-        this.hits++;
-        u.damage(res.head ? W.head : W.body, p);
-        this.fx.hitPuff(res.point);
-        const killed = !u.alive;
-        if (killed && u.team === 'ltte') this.kills++;
-        this.flashHitmarker(killed);
-      }
-    } else if (res) {
-      this.fx.impact(res.point, res.kind);
-    }
+    this.bulletHit(res, W.body, W.head, () => this.world.raycast(origin, aimDir, 450, p)?.unit);
 
     // recoil
     this.pitch = Math.min(0.75, this.pitch + W.recoil * (0.6 + Math.random() * 0.6) * stanceMul);
     this.yaw += (Math.random() - 0.5) * W.recoil * 0.6;
   }
 
-  throwGrenade() {
-    this.grenades--;
-    const p = this.player, d = new THREE.Vector3();
-    this.camera.getWorldDirection(d);
-    const pos = p.pos.clone().add(new THREE.Vector3(0, p.eyeHeight, 0)).addScaledVector(d, 0.6);
-    const vel = d.multiplyScalar(15).add(new THREE.Vector3(0, 4, 0));
-    const obj = models.grenade.clone(true);
-    obj.scale.setScalar(1.6);
-    this.scene.add(obj);
-    this.projectiles.push({ obj, pos, vel, fuse: 3 });
-    this.toast('Grenade out!');
+  // what a bullet does to whatever it hit. aimedAt() tells which unit the
+  // un-spread aim line points at: only shots aimed at a civilian hurt them.
+  bulletHit(res, body, head, aimedAt) {
+    const p = this.player;
+    const guest = this.net.active && this.net.role === 'guest';
+    if (res?.kind === 'unit' && res.unit.team === 'army' && (!guest || res.unit.remote)) {
+      // friendly fire wounds your own soldiers (never the other players)
+      const u = res.unit;
+      if (!u.remote) u.damage(body * 0.5, p);
+      this.fx.hitPuff(res.point);
+      this.toast('Check your fire — friendly!', true);
+      this.friendlyHits = (this.friendlyHits || 0) + 1;
+    } else if (guest && res?.kind === 'unit') {
+      // the host owns every unit: report the hit and let it apply the damage
+      const u = res.unit, aimed = aimedAt() === u;
+      this.net.send({ t: 'hit', nid: u.nid, dmg: res.head ? head : body, aimed });
+      if (u.team === 'army') this.toast('Check your fire — friendly!', true);
+      else if (u.team === 'civ') { this.toast('HOLD FIRE — civilians!', true); this.civIncidents++; this.storyEvent('civilianWarning'); }
+      else { this.hits++; this.fx.hitPuff(res.point); this.flashHitmarker(false); }
+    } else if (res?.kind === 'unit') {
+      const u = res.unit;
+      if (u.team === 'civ') {
+        if (aimedAt() === u) u.damage(40, p);
+        if (u.alive) this.toast('HOLD FIRE — civilians!', true);
+        this.civIncidents++;
+        this.storyEvent('civilianWarning');
+      } else {
+        this.hits++;
+        u.damage(res.head ? head : body, p);
+        this.fx.hitPuff(res.point);
+        const killed = !u.alive;
+        if (killed && u.team === 'ltte') this.kills++;
+        this.flashHitmarker(killed);
+      }
+    } else if (res) {
+      this.fx.impact(res.point, res.kind === 'vehicle' ? 'prop' : res.kind);
+    }
+  }
+
+  // ------------------------------------------------------------ vehicles
+
+  nearestVehicle() {
+    const p = this.player.pos;
+    let best = null, bd = Infinity;
+    for (const v of this.vehicles) {
+      if (!v.alive || v.driverNid != null) continue;
+      const d = Math.hypot(v.pos.x - p.x, v.pos.z - p.z) - v.size;
+      if (d < 2.2 && d < bd && Math.abs(v.pos.y - p.y) < 4) { bd = d; best = v; }
+    }
+    return best;
+  }
+
+  enterVehicle(v) {
+    if (!v.alive || v.driverNid != null) { this.toast('Someone is already at the controls'); return; }
+    const p = this.player;
+    if (p.towerCenter) p.setTower(null);
+    this.binos = false;
+    this.reloading = 0;
+    this.jumpH = 0;
+    p.stance = 'stand';
+    this.vehicle = v;
+    v.driver = p;
+    v.driverNid = this.net.active ? this.net.myNid : 'me';
+    p.vehicle = v;
+    v.occupants.add(p);
+    // the section climbs in with you (the host runs the AI soldiers)
+    if (v.cfg.seats && !(this.net.active && this.net.role === 'guest')) {
+      const near = this.squadAllies().filter((a) => !a.downed && !a.vehicle && a.pos.distanceTo(v.pos) < 40).slice(0, v.cfg.seats);
+      for (const a of near) { a.vehicle = v; v.occupants.add(a); a.order = 'follow'; }
+      if (near.length) this.radio.say([[this.speakerKey(near[0]), v.kind === 'air' ? 'All aboard, Sir — lift when ready!' : 'Mounting up, Sir!']]);
+    }
+    this.yaw = v.yaw;
+    this.pitch = v.kind === 'jet' ? 0 : -0.12;
+    document.body.classList.add('invehicle');
+    document.body.dataset.vehicle = v.kind;
+    const t = this.input.touch;
+    const how = {
+      ground: t ? 'Stick: drive · FIRE: gun · GREN: smoke' : 'W/S drive · A/D steer · mouse aim · click fire · G smoke · F get out',
+      water: t ? 'Stick: steer · FIRE: gun' : 'W/S throttle · A/D steer · mouse aim · click fire · F get out at the shore',
+      air: t ? 'UP / DOWN: climb · stick: fly · FIRE: gun · GREN: rockets' : 'Space climb · C descend · WASD fly · mouse aim · click gun · G rockets · F get out (landed)',
+      jet: t ? 'Stick up: speed · look to steer · FIRE: cannon · GREN: bomb' : 'W to take off · mouse steers · A/D roll · click cannon · G bomb · F return to base',
+    }[v.kind];
+    this.toast(`${v.name}: ${how}`, true);
+    this.renderWeaponBar();
+  }
+
+  // step out beside the hull, on dry ground
+  exitSpot(v, far = 8) {
+    const w = this.world;
+    for (let r = v.cfg.box[0] + 1.4; r <= far; r += 1.5) {
+      for (let k = 0; k < 12; k++) {
+        const a = v.yaw + Math.PI / 2 + (k * Math.PI * 2) / 12;
+        const x = v.pos.x + Math.sin(a) * r, z = v.pos.z + Math.cos(a) * r;
+        if (Math.abs(x) > w.size - 3 || Math.abs(z) > w.size - 3 || w.isWater(x, z, -0.1)) continue;
+        v.box.off = true;
+        const bad = w.blocked(x, z, 0.45);
+        v.box.off = false;
+        if (!bad) return { x, z };
+      }
+    }
+    return null;
+  }
+
+  exitVehicle(force = false) {
+    const v = this.vehicle;
+    if (!v) return;
+    if (!force) {
+      if (v.kind === 'air' && v.airborne) { this.toast(`Land first — hold ${this.input.touch ? 'DOWN' : 'C'} to descend`); return; }
+      if (v.kind === 'jet' && v.airborne) { this.returnJet(v); return; }
+      if (Math.abs(v.speed) > 4) { this.toast('Slow down first'); return; }
+    }
+    const spot = this.exitSpot(v, force ? 40 : 8);
+    if (!spot && !force) { this.toast(v.kind === 'water' ? 'Steer to the shore to get off' : 'No room to get out here'); return; }
+    this.leaveVehicle(v, spot || { x: v.pos.x, z: v.pos.z });
+  }
+
+  leaveVehicle(v, spot) {
+    const p = this.player, w = this.world;
+    p.vehicle = null;
+    v.occupants.delete(p);
+    v.driver = null;
+    v.driverNid = null;
+    p.pos.set(spot.x, w.height(spot.x, spot.z), spot.z);
+    p.obj.visible = true;
+    // the section gets out around you
+    let k = 0;
+    for (const u of [...v.occupants]) {
+      if (u.isPlayer || u.remote) continue;
+      const a = (k++ / 6) * Math.PI * 2;
+      let x = spot.x + Math.sin(a) * 2.2, z = spot.z + Math.cos(a) * 2.2;
+      if (w.isWater(x, z, -0.1) || w.blocked(x, z, 0.4)) { x = spot.x; z = spot.z; }
+      u.vehicle = null;
+      u.pos.set(x, w.height(x, z), z);
+      u.obj.visible = true;
+      v.occupants.delete(u);
+    }
+    this.vehicle = null;
+    this.yaw = v.yaw;
+    document.body.classList.remove('invehicle');
+    this.audio.engine(null);
+    this.updateCamera(0, true);
+    this.renderWeaponBar();
+  }
+
+  // a jet cannot land on this ground: it flies back to its strip and you walk away from it
+  returnJet(v) {
+    v.airborne = false;
+    v.speed = 0;
+    v.vel.set(0, 0, 0);
+    v.pos.set(v.home.x, v.groundAt(v.home.x, v.home.z), v.home.z);
+    v.yaw = v.home.yaw;
+    v.pitch = v.roll = 0;
+    v.sync();
+    this.fadeIn();
+    this.toast('Back at the strip — the jet is refuelled and re-armed', true);
+    v.altAmmo = v.cfg.alt.ammo;
+    v.heat = 0;
+    const spot = this.exitSpot(v, 30) || { x: v.pos.x + 6, z: v.pos.z };
+    this.leaveVehicle(v, spot);
+  }
+
+  onVehicleDestroyed(v) {
+    const p = this.player, mine = this.vehicle === v;
+    if (this.net.active && this.net.role === 'guest' && mine) this.net.send({ t: 'vdead', i: v.index });
+    this.killfeed(`${v.name} destroyed`);
+    if (mine) {
+      this.toast('Bail out!', true);
+      const spot = this.exitSpot(v, 40) || { x: THREE.MathUtils.clamp(v.pos.x, -this.world.size + 3, this.world.size - 3), z: v.pos.z };
+      const occupants = [...v.occupants].filter((u) => !u.isPlayer);
+      this.leaveVehicle(v, spot);
+      p.hp -= 35;
+      this.onPlayerHit(v.pos);
+      if (p.hp <= 0) p.die(null);
+      for (const u of occupants) u.damage(90, null);
+    } else {
+      // a partner's or an empty vehicle: anyone inside gets out hurt
+      for (const u of [...v.occupants]) {
+        u.vehicle = null;
+        u.obj.visible = true;
+        u.pos.y = this.world.height(u.pos.x, u.pos.z);
+        if (!u.remote) u.damage(90, null);
+      }
+      v.occupants.clear();
+      v.driver = null;
+      v.driverNid = null;
+    }
+  }
+
+  updateVehicle(dt) {
+    const v = this.vehicle, inp = this.input, p = this.player;
+    const look = inp.consumeLook();
+    const sens = 0.0022 * (this.camera.fov / 70) * this.profile.settings.sensitivity;
+    this.yaw -= look.x * sens;
+    this.pitch = THREE.MathUtils.clamp(this.pitch - look.y * sens, -1.2, 0.9);
+    inp.consumeWheel();
+    const mv = inp.moveVec;
+    v.drive(dt, {
+      throttle: mv.y, steer: mv.x, up: inp.keys.has('Space'), down: inp.keys.has('KeyC') || inp.keys.has('ControlLeft'),
+      aimYaw: this.yaw, aimPitch: this.pitch,
+    });
+    p.pos.set(v.pos.x, v.pos.y + 0.6, v.pos.z);
+    p.yaw = this.yaw;
+    p.speed = Math.abs(v.speed);
+    if (!this.vehicle) return; // crashed
+    // guns
+    v.fireCd -= dt;
+    v.altCd -= dt;
+    v.overheat -= dt;
+    v.heat = Math.max(0, v.heat - dt * (v.overheat > 0 ? 0.5 : 0.3));
+    if (inp.fire && v.fireCd <= 0 && v.overheat <= 0) this.vehicleShot(v);
+    if (inp.hit('KeyG')) this.vehicleAlt(v);
+    if (inp.hit('KeyL')) this.support.toggle();
+    if (this.support.open) this.support.keys(inp);
+    if (inp.hit('KeyF')) this.exitVehicle();
+    if (this.net.active) {
+      if (inp.hit('Enter')) this.openChat();
+      if (inp.hit('KeyK')) this.net.setMic(!this.net.micOn);
+    }
+    if (inp.hit('KeyT')) this.orderSquad();
+    if (this.time - this.lastPlayerHit > 5 && p.hp < 60) p.hp = Math.min(60, p.hp + 9 * dt);
+    const level = v.kind === 'air' ? 0.4 + v.speed / v.cfg.top * 0.6 : Math.min(1, Math.abs(v.speed) / v.cfg.top);
+    this.audio.engine(v.type === 'heli' ? 'heli' : v.type, level);
+    if (v.kind !== 'jet' || !v.airborne) this.noise(v.pos, 30, false);
+    this.updateInteraction(dt);
+  }
+
+  // the vehicle's main gun: aimed by the camera, fired from the mount
+  vehicleShot(v) {
+    const k = v.cfg.gun, p = this.player, cam = this.camera;
+    v.fireCd = k.interval;
+    v.heat += k.heat;
+    if (v.heat >= 1) { v.heat = 1; v.overheat = 2.5; this.toast('Gun overheated — wait for it to cool'); }
+    this.shots++;
+    const dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    const aimDir = dir.clone();
+    dir.x += (Math.random() - 0.5) * k.spread * 2;
+    dir.y += (Math.random() - 0.5) * k.spread * 2;
+    dir.z += (Math.random() - 0.5) * k.spread * 2;
+    dir.normalize();
+    const muzzle = v.muzzle();
+    const aim = this.world.raycast(cam.position, dir, 600, p);
+    const target = aim ? aim.point : cam.position.clone().addScaledVector(dir, 600);
+    const d2 = target.clone().sub(muzzle).normalize();
+    const res = this.world.raycast(muzzle, d2, 600, p);
+    const end = res ? res.point : muzzle.clone().addScaledVector(d2, 600);
+    this.fx.tracer(muzzle, end, 0xffe080);
+    if (this.shots % 2) this.fx.muzzle(muzzle);
+    this.audio.weapon(k.sound);
+    this.noise(v.pos, k.noise, true);
+    this.suppress(end, 5, 2.5);
+    if (this.net.active) {
+      const r = (x) => x.toArray().map((n) => Math.round(n * 100) / 100);
+      this.net.send(this.net.role === 'guest' ? { t: 'shot', a: r(muzzle), b: r(end), noise: k.noise } : { t: 'fx', a: r(muzzle), b: r(end), c: 0xffe080 });
+    }
+    if (k.blast && res && this.shots % 3 === 0) this.explode(res.point, 3, 70, p);
+    else this.bulletHit(res, k.body, k.head, () => this.world.raycast(cam.position, aimDir, 600, p)?.unit);
+    this.fx.shake = Math.max(this.fx.shake, 0.12);
+  }
+
+  vehicleAlt(v) {
+    const a = v.cfg.alt, p = this.player;
+    if (!a) { this.toast(`The ${v.name} has no second weapon`); return; }
+    if (v.altCd > 0) return;
+    if (v.altAmmo <= 0) { this.toast(`${a.name}: none left`); return; }
+    v.altAmmo--;
+    if (a.smoke) {
+      v.altCd = 1.5;
+      for (const sx of [-5, 0, 5]) this.addSmoke(v.local(sx, 0, 7));
+      this.toast('Smoke screen!');
+      return;
+    }
+    const pod = a.pods[v.podSide++ % a.pods.length];
+    const from = v.local(pod[0], pod[1], pod[2]);
+    if (a.bomb) {
+      v.altCd = 0.5;
+      const vel = v.forward.clone().multiplyScalar(v.speed).add(new THREE.Vector3(0, -3, 0));
+      this.fireRocket(from, null, p, { bomb: true, vel, r: 12, dmg: 450, ignore: p });
+      this.toast(`Bomb away (${v.altAmmo} left)`);
+      this.audio.click();
+      return;
+    }
+    v.altCd = 0.22;
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const hit = this.world.raycast(this.camera.position, dir, 500, p);
+    const target = hit ? hit.point : this.camera.position.clone().addScaledVector(dir, 500);
+    this.fireRocket(from, target.sub(from).normalize(), p, { speed: 95, r: 6.5, dmg: 260, ignore: p });
+    this.fx.muzzle(from);
+    this.audio.rocket();
+    this.noise(v.pos, 160, true);
+  }
+
+  // third-person chase camera round the vehicle
+  vehicleCamera(dt, snap) {
+    const v = this.vehicle, [dist, h] = v.cfg.cam, aim = this.input.aim;
+    const d = new THREE.Vector3(Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), Math.cos(this.yaw) * Math.cos(this.pitch));
+    const pivot = v.pos.clone().add(new THREE.Vector3(0, h, 0));
+    const want = pivot.clone().addScaledVector(d, -(aim ? dist * 0.6 : dist));
+    const w = this.world;
+    const gh = Math.max(w.height(want.x, want.z), w.water ?? -99) + 0.8;
+    if (want.y < gh) want.y = gh;
+    if (snap) this.camPos.copy(want);
+    else this.camPos.lerp(want, Math.min(1, dt * (v.kind === 'jet' ? 14 : 9)));
+    this.camera.position.copy(this.camPos);
+    this.camera.lookAt(this.camPos.clone().add(d));
+    const fov = (aim ? 38 : v.kind === 'jet' ? 74 : 66) * this.portraitZoom();
+    this.camera.fov += (fov - this.camera.fov) * Math.min(1, dt * 8 || 1);
+    if (this.fx.shake > 0) {
+      const s = this.fx.shake * 0.15;
+      this.camera.position.x += (Math.random() - 0.5) * s;
+      this.camera.position.y += (Math.random() - 0.5) * s;
+    }
+    this.camera.updateProjectionMatrix();
+    this.audio.setListener(v.pos, this.yaw);
+  }
+
+  // the launcher: a rocket flies to where the crosshair points
+  shootRocket() {
+    const p = this.player, cam = this.camera, W = this.W, dir = new THREE.Vector3();
+    cam.getWorldDirection(dir);
+    const spread = this.input.aim ? W.spreadAim : W.spreadHip;
+    dir.x += (Math.random() - 0.5) * spread; dir.y += (Math.random() - 0.5) * spread;
+    dir.normalize();
+    // aim from the camera, launch from the muzzle
+    const target = this.world.raycast(cam.position, dir, 400, p)?.point || cam.position.clone().addScaledVector(dir, 400);
+    const muzzle = p.muzzleWorld(new THREE.Vector3());
+    this.fireRocket(muzzle, target.clone().sub(muzzle).normalize(), p);
+    this.fx.muzzle(muzzle);
+    this.fx.trail(muzzle.clone().addScaledVector(dir, -1));
+    this.audio.weapon('rpg');
+    this.noise(p.pos, W.noise, true);
+    this.pitch = Math.min(0.75, this.pitch + W.recoil);
   }
 
   updateProjectiles(dt) {
     for (const g of this.projectiles) {
+      if (g.kind === 'rocket' || g.kind === 'bomb') {
+        g.vel.y -= (g.kind === 'bomb' ? 9.8 : 1.2) * dt;
+        const step = g.vel.length() * dt, dir = g.vel.clone().normalize();
+        const res = this.world.raycast(g.pos, dir, step, g.ignore);
+        if (res) { g.pos.copy(res.point).addScaledVector(dir, -0.2); g.fuse = 0; } else g.pos.addScaledVector(g.vel, dt);
+        if ((g.life -= dt) <= 0) g.fuse = 0;
+        g.obj.position.copy(g.pos);
+        g.obj.lookAt(g.pos.clone().add(g.vel));
+        if (g.kind === 'rocket' && (g.trailT = (g.trailT || 0) - dt) <= 0) { g.trailT = 0.03; this.fx.trail(g.pos); }
+        if (g.fuse <= 0) { this.scene.remove(g.obj); this.explode(g.pos, g.r, g.dmg, g.source); }
+        continue;
+      }
       g.vel.y -= 18 * dt;
       g.pos.addScaledVector(g.vel, dt);
       const h = this.world.height(g.pos.x, g.pos.z);
@@ -1272,7 +1759,8 @@ class Game {
       g.fuse -= dt;
       if (g.fuse <= 0) {
         this.scene.remove(g.obj);
-        this.explode(g.pos, 7.5, 220, this.player);
+        if (g.kind === 'smoke') this.addSmoke(g.pos);
+        else this.explode(g.pos, 7.5, 220, this.player);
       }
     }
     this.projectiles = this.projectiles.filter((g) => g.fuse > 0);
@@ -1280,20 +1768,27 @@ class Game {
 
   explode(pos, radius, damage, source) {
     if (this.net.active) {
+      const m = { t: 'boom', p: pos.toArray().map((v) => Math.round(v * 100) / 100), r: radius, d: damage };
       if (this.net.role === 'guest' && source === this.player) {
         this.fx.explosion(pos);
         this.audio.explosion(pos);
-        this.net.send({ t: 'boom', p: pos.toArray() });
+        this.fx.shake = Math.max(this.fx.shake, 1.2 - pos.distanceTo(this.player.pos) / 40);
+        this.net.send(m);
         return;
       }
-      this.net.send({ t: 'boom', p: pos.toArray() });
+      this.net.send(m);
     }
     this.fx.explosion(pos);
     this.audio.explosion(pos);
     this.fx.shake = Math.max(this.fx.shake, 1.2 - pos.distanceTo(this.player.pos) / 40);
     const from = pos.clone().add(new THREE.Vector3(0, 0.4, 0));
+    for (const v of this.vehicles) {
+      if (!v.alive) continue;
+      const d = Math.max(0, v.pos.distanceTo(from) - v.size);
+      if (d < radius) v.damage(damage * 2.2 * (1 - d / radius), source, true);
+    }
     for (const u of this.units) {
-      if (!u.alive) continue;
+      if (!u.alive || u.vehicle) continue;
       const chest = u.pos.clone().add(new THREE.Vector3(0, Math.min(1, u.bodyHeight * 0.6), 0));
       const d = chest.distanceTo(from);
       if (d > radius || !this.world.lineOfSight(from, chest)) continue;
@@ -1499,6 +1994,7 @@ class Game {
     const u = this.units.find((x) => x.nid === m.nid);
     const src = this.partners.get(from) || null;
     if (!u || !u.alive) return;
+    if (u.team === 'army') { if (!u.remote) u.damage(m.dmg * 0.5, src); return; }
     if (u.team === 'civ') {
       if (m.aimed) u.damage(40, src);
       this.civIncidents++;
@@ -1510,10 +2006,11 @@ class Game {
   }
 
   partnerGrenade(m, from) {
-    this.explode(new THREE.Vector3(...m.p), 7.5, 220, this.partners.get(from) || null);
+    this.explode(new THREE.Vector3(...m.p), m.r || 7.5, m.d || 220, this.partners.get(from) || null);
   }
 
   partnerInteract(m) {
+    if (m.kind === 'revive') { const u = this.unitByNid(m.nid); if (u?.downed) this.revive(u); }
     if (m.kind === 'target') { const t = this.world.targets[m.i]; if (t && !t.done) this.completeTarget(t); }
     if (m.kind === 'alarm') { const a = this.world.alarms[m.i]; if (a && !a.disabled) this.completeAlarm(a); }
   }
@@ -1532,6 +2029,14 @@ class Game {
       u.remove();
       if (this.units.includes(u)) this.units.splice(this.units.indexOf(u), 1);
       this.partners.delete(nid);
+    }
+    // their vehicle stops where they left it
+    for (const v of this.vehicles) {
+      if (v.driverNid !== nid) continue;
+      v.driverNid = null;
+      v.driver = null;
+      v.netPose = null;
+      if (u) v.occupants.delete(u);
     }
     if (this.net.role === 'guest' && nid === 'H') {
       this.net.setStatus('Lost the connection to the host.');
@@ -1664,6 +2169,12 @@ class Game {
   findInteraction() {
     const o = this.currentObjective(), p = this.player.pos;
     const near = (x, z, r) => Math.hypot(x - p.x, z - p.z) < r;
+    if (this.vehicle) {
+      const v = this.vehicle;
+      return { label: v.kind === 'jet' && v.airborne ? 'Return to base' : 'Get out', time: 0.4, done: () => this.exitVehicle() };
+    }
+    const down = this.units.find((u) => u.downed && u.alive && u.team === 'army' && near(u.pos.x, u.pos.z, 2.2));
+    if (down) return { label: `Patch up ${down.name || 'the wounded soldier'}`, time: 3, done: () => this.revive(down) };
     if (o?.type === 'interact') {
       const t = this.world.targets.find((t) => t.tag === o.tag && !t.done && near(t.x, t.z, t.obj ? 7 : 3.5));
       if (t) {
@@ -1688,6 +2199,8 @@ class Game {
         time: 0.6, done: () => this.pickUp(pk),
       };
     }
+    const veh = this.nearestVehicle();
+    if (veh) return { label: `Board the ${veh.name}${this.input.touch ? '' : ' (or press F)'}`, time: 0.5, done: () => this.enterVehicle(veh) };
     const pl = this.player;
     if (pl.towerCenter) return { label: 'Climb down the tower', time: 0.8, done: () => pl.setTower(null) };
     const tw = this.world.towers.find((t) => near(t.x, t.z, 2.8));
@@ -1740,6 +2253,7 @@ class Game {
   }
 
   updateCamera(dt, snap = false) {
+    if (this.vehicle) { this.vehicleCamera(dt, snap); return; }
     const p = this.player, inp = this.input;
     const scoped = this.isScoped(), binos = this.binos && p.alive;
     // rifle sway when looking through the scope; holding breath (Shift) steadies it
@@ -1762,7 +2276,7 @@ class Game {
       this.camera.position.copy(eye);
       this.camera.lookAt(eye.clone().add(d));
       p.obj.visible = false;
-      fov = (binos ? 7 : 11) * this.portraitZoom();
+      fov = (70 / this.opticZoom) * this.portraitZoom();
     } else {
       p.obj.visible = true;
       const aim = inp.aim && p.alive;
@@ -1820,8 +2334,29 @@ class Game {
     if (Math.floor(this.time * 2) !== this.lastChatRender) { this.lastChatRender = Math.floor(this.time * 2); this.renderChat(); }
   }
 
+  updateVehicleHUD() {
+    const v = this.vehicle;
+    if (!v) return;
+    $('.vh-name').textContent = v.name.toUpperCase();
+    $('.vh-hp div').style.width = `${Math.max(0, (v.hp / v.cfg.hp) * 100)}%`;
+    $('.vh-heat div').style.width = `${v.heat * 100}%`;
+    $('.vh-heat').classList.toggle('hot', v.overheat > 0);
+    const kmh = Math.round(Math.abs(v.speed) * 3.6);
+    const alt = v.kind === 'air' || v.kind === 'jet' ? ` · altitude ${Math.max(0, Math.round(v.pos.y - Math.max(this.world.height(v.pos.x, v.pos.z), this.world.water ?? -99)))} m` : '';
+    const alt2 = v.cfg.alt ? `<br>${v.cfg.alt.name}: ${v.altAmmo} (${this.input.touch ? 'GREN' : 'G'})` : '';
+    const occ = [...v.occupants].filter((u) => !u.isPlayer).length;
+    $('.vh-info').innerHTML = `${kmh} km/h${alt}<br>${v.cfg.gun.name}${alt2}${occ ? `<br>${occ} soldier${occ > 1 ? 's' : ''} aboard` : ''}`;
+    let warn = '';
+    if (v.kind === 'jet' && v.lowAlt) warn = 'PULL UP';
+    else if (v.overheat > 0) warn = 'GUN OVERHEATED';
+    else if (v.hp < v.cfg.hp * 0.3) warn = 'HULL CRITICAL';
+    else if (v.kind === 'air' && v.spin < 0.75) warn = 'ROTOR SPINNING UP…';
+    $('.vh-warn').textContent = warn;
+  }
+
   updateHUD() {
     this.updateCoopHUD();
+    this.updateVehicleHUD();
     const p = this.player;
     const hp = $('.hp-bar div');
     hp.style.width = `${Math.max(0, p.hp)}%`;
@@ -1841,7 +2376,7 @@ class Game {
     const roleTag = { marksman: ' (marksman)', gunner: ' (gunner)', medic: ' (medic)' };
     const partnerLine = [...this.partners.values()].map((u) => `<span style="color:#7fc8e8">${u.name} (co-op) · ${Math.max(0, Math.round(u.hp))}%</span><br>`).join('');
     $('.squad').innerHTML = partnerLine + allies.map((a) => `${a.name}${roleTag[a.role] || ''} · ${(a.order || 'follow').toUpperCase()}`
-      + `${a.role === 'medic' ? (a.patient ? ' · treating' : ` · ${a.kits} dressings`) : ''}${a.hp < 60 ? ' · wounded' : ''}`).join('<br>');
+      + `${a.role === 'medic' ? (a.patient ? ' · treating' : ` · ${a.kits} dressings`) : ''}${a.downed ? ' · <b class="down">DOWN</b>' : a.hp < 60 ? ' · wounded' : ''}${a.vehicle ? ' · mounted' : ''}`).join('<br>');
 
     // waypoint
     const wp = this.objectiveWaypoint();
@@ -1870,7 +2405,12 @@ class Game {
     const W = window.innerWidth, H = window.innerHeight;
     const scoped = this.isScoped(), binos = this.binos && p.alive;
     $('.ammo-name').textContent = this.W.name.toUpperCase();
-    $('.ammo-gren').textContent = `GRENADES ${this.grenades} (G)`;
+    const ex = this.explosives;
+    $('.ammo-gren').innerHTML = Object.entries(THROWABLES).map(([k, n]) => `<span class="${k === this.throwType ? 'on' : ''}">${n.split(' ')[0].toUpperCase()} ${ex[k]}</span>`).join(' ')
+      + `<small>${this.input.touch ? '⇄ switch · GREN use' : 'Y switch · G use'}${this.c4Placed.length ? ` · ${this.input.touch ? 'DET' : 'U'} detonate ${this.c4Placed.length}` : ''}</small>`;
+    if (this.wbarKey !== `${this.wi}:${this.ammo}:${this.reserve}:${this.weapons.map((w) => w.id).join()}`) this.renderWeaponBar();
+    document.body.classList.toggle('scoped', this.isScoped() || (this.binos && p.alive));
+    $('.zoom-level').textContent = `${this.opticZoom}×`;
     $('.stance-ind').textContent = `${p.stance.toUpperCase()}${p.towerCenter ? ' · TOWER' : ''}${this.world.inBush(p.pos.x, p.pos.z) ? ' · IN COVER' : ''}`;
     // set display directly as well: some phone browsers kept showing the scope
     const sc = $('.scope'), bn = $('.binos');
@@ -1953,6 +2493,12 @@ class Game {
     const x = ((e.clientX - r.left) / r.width) * 2 * S - S, z = ((e.clientY - r.top) / r.height) * 2 * S - S;
     if (Math.abs(x) > S || Math.abs(z) > S || this.world.isWater(x, z, 0.2)) { this.toast('Pick a spot on land'); return; }
     const point = new THREE.Vector3(x, this.world.height(x, z), z);
+    if (this.mapMode === 'strike') {
+      this.strikeMark = point;
+      this.toast(`Strike target marked (${Math.round(point.distanceTo(this.player.pos))} m) — call artillery or an air strike (${this.input.touch ? 'CALL' : 'L'})`, true);
+      this.drawMap();
+      return;
+    }
     const allies = this.squadAllies();
     const group = this.mapMode === 'all' ? allies : allies.length > 1 ? allies.filter((a) => a.followSlot % 2 === 1) : allies;
     if (!group.length) return;
@@ -2029,6 +2575,9 @@ class Game {
     }
     const wp = this.objectiveWaypoint();
     if (wp) glyph(wp.x, wp.z, '◇', '#e0b84a', 22);
+    const vg = { ground: '▣', air: '✈', jet: '✈', water: '⛴' };
+    for (const v of this.vehicles) if (v !== this.vehicle) glyph(v.pos.x, v.pos.z, vg[v.kind], v.alive ? '#9fd0ff' : '#555', 15);
+    if (this.strikeMark) glyph(this.strikeMark.x, this.strikeMark.z, '⊕', '#ff6a3a', 24);
     // planned moves
     ctx.strokeStyle = 'rgba(155, 209, 106, 0.7)';
     ctx.setLineDash([4, 4]);
@@ -2046,8 +2595,8 @@ class Game {
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
     ctx.restore();
-    $('.map-info').innerHTML = `<b>${this.mission.name.toUpperCase()}</b> · ${o ? o.text : ''}<br><span>▲ you · ● squad · ✕ planned move · ◆ marked hostile · ⚑ alarm · ▲ tower · ✚ supplies · ◇ objective · N is up</span><br><span>Tap or click the map to send ${this.mapMode === 'all' ? 'the whole section' : 'Bravo team'} there.</span>`;
-    $('.map-mode').textContent = this.mapMode === 'all' ? 'Orders: whole section' : 'Orders: Bravo team';
+    $('.map-info').innerHTML = `<b>${this.mission.name.toUpperCase()}</b> · ${o ? o.text : ''}<br><span>▲ you · ● squad · ✕ planned move · ◆ marked hostile · ⚑ alarm · ▲ tower · ✚ supplies · ◇ objective · ▣ ✈ ⛴ vehicles · ⊕ strike target · N is up</span><br><span>${this.mapMode === 'strike' ? 'Tap or click the map to mark a target for artillery or an air strike (⊕).' : `Tap or click the map to send ${this.mapMode === 'all' ? 'the whole section' : 'Bravo team'} there.`}</span>`;
+    $('.map-mode').textContent = { all: 'Orders: whole section', strike: 'Orders: strike target', bravo: 'Orders: Bravo team' }[this.mapMode] || 'Orders: Bravo team';
   }
 
   updateCompass(wp) {
@@ -2166,6 +2715,14 @@ class Game {
       // the co-op guest only draws the host's units; the host runs their AI
       const guest = this.net.active && this.net.role === 'guest';
       for (const u of this.units) if (!u.isPlayer) { if (guest) u.netSync(dt); else u.update(dt); }
+      for (const v of this.vehicles) {
+        if (v === this.vehicle) continue;
+        if (v.netPose && (guest || v.driverNid != null)) v.netSync(dt);
+        else v.idle(dt);
+      }
+      this.support.update(dt);
+      for (const sm of this.world.smokes) sm.t -= dt;
+      this.world.smokes = this.world.smokes.filter((sm) => sm.t > 0);
       this.alertLevel = Math.max(0, this.alertLevel - dt);
       this.updateShelling(dt);
       this.radio.update(dt);

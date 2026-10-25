@@ -140,6 +140,7 @@ Rules:
 | E | M4 — Loadout | Loadout screen (menu and briefing), machine gun, extra magazines, grenade pouch, rank unlocks, night vision (N) | ✅ |
 | C | M5 — New missions | Sampur, Vakarai, Anandapuram, Puthumathalan (10 missions in chronological order; saves migrate) | ✅ |
 | F | M6 — Co-op | PeerJS lobby, invite links, host-authoritative sync, guest hits/grenades/interactions, shared XP, disconnect handling; automated two-browser test | ✅ |
+| — | M8 — Combined arms | Weapon bar, scope zoom 4×/8×/12×, RPG-7, smoke grenades, C4; drivable Buffel APC, flyable gunship and jet, Navy boat with mounted guns, squad mounts up; radio support (reinforcements, artillery, air strike, supply drop) refused near civilians or own troops; squadmates go down and are patched up, friendly fire; vehicles and support in co-op; Expo Android wrapper (`mobile/`) | ✅ (APC/heli/jet/boat tested in headless Chromium only) |
 | G | M7 — Release | Graphics settings (low/medium/high) ✅, Vercel deployment with auto-deploy from `main` ✅ (https://wanni-front.vercel.app), performance pass on real hardware 🔜 | 🟡 |
 
 ## 9. Testing

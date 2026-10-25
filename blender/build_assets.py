@@ -1477,6 +1477,103 @@ def terrain_textures():
         save_png("grass_blade", rgba, alpha=True)
 
 
+
+def build_rpg(p):
+    """Shoulder-fired rocket launcher: tube, grips, sight and a loaded warhead."""
+    metal = mat("rpg_metal", "#2b2e2a", 0.45, 0.8)
+    wood = mat("rpg_wood", "#6a3a1a", 0.6)
+    olive = mat("rpg_warhead", "#4b5230", 0.6, 0.3)
+    p.cyl(metal, 0.032, 0.95, (0, 0.05, 0.06), (90, 0, 0), seg=12)          # tube
+    p.cyl(metal, 0.05, 0.16, (0, 0.55, 0.06), (90, 0, 0), seg=12, r2=0.034)  # rear blast cone
+    p.cyl(wood, 0.042, 0.28, (0, -0.02, 0.06), (90, 0, 0), seg=12)           # heat shield
+    p.cyl(olive, 0.03, 0.12, (0, -0.48, 0.06), (90, 0, 0), seg=10)           # warhead neck
+    p.cyl(olive, 0.06, 0.22, (0, -0.62, 0.06), (90, 0, 0), seg=12, r2=0.03)  # warhead
+    p.cyl(olive, 0.03, 0.12, (0, -0.79, 0.06), (90, 0, 0), seg=10, r2=0.006) # nose
+    p.box(wood, (0.035, 0.05, 0.11), (0, 0.06, -0.03), (-15, 0, 0))          # pistol grip
+    p.box(wood, (0.035, 0.05, 0.1), (0, -0.16, -0.025), (-10, 0, 0))         # front grip
+    p.box(metal, (0.03, 0.08, 0.05), (0.035, -0.12, 0.11))                   # optical sight
+    p.cyl(metal, 0.012, 0.05, (0.035, -0.07, 0.13), (90, 0, 0), seg=8)
+    return (0, -0.82, 0.06), (0.035, -0.08, 0.14), ((0, 0.06, -0.06), (0, -0.16, -0.05))
+
+
+def jet():
+    """Generic delta-wing ground attack jet in air force grey (not a specific aircraft)."""
+    reset()
+    grey = mat("jet_grey", "#7d868c", 0.45, 0.4)
+    dark = mat("jet_dark", "#2a2e31", 0.4, 0.6)
+    glass = mat("jet_glass", "#1d2c35", 0.05, 0.6)
+    bomb = mat("jet_bomb", "#4a5032", 0.6, 0.3)
+    root = empty("Jet")
+    p = Part("Body", 0.4)
+    p.cyl(grey, 0.62, 9.0, (0, 0.6, 1.6), (90, 0, 0), seg=14)                # fuselage
+    p.cyl(grey, 0.62, 3.0, (0, -5.4, 1.6), (90, 0, 0), seg=14, r2=0.05)      # nose cone
+    p.cyl(dark, 0.5, 0.6, (0, 5.35, 1.6), (90, 0, 0), seg=14, r2=0.42)       # exhaust
+    p.sphere(glass, 0.5, (0, -3.0, 2.15), (0.85, 2.2, 0.8), seg=14)          # canopy
+    for sx in (-1, 1):
+        p.quad(grey, [(sx * 0.5, -1.6, 1.5), (sx * 4.6, 3.6, 1.4), (sx * 4.6, 4.6, 1.4), (sx * 0.5, 4.6, 1.5)])
+        p.quad(grey, [(sx * 0.5, -1.6, 1.46), (sx * 0.5, 4.6, 1.46), (sx * 4.6, 4.6, 1.36), (sx * 4.6, 3.6, 1.36)])
+        p.quad(grey, [(sx * 0.4, -3.6, 1.75), (sx * 1.7, -2.5, 1.7), (sx * 1.7, -2.1, 1.7), (sx * 0.4, -2.1, 1.75)])   # canards
+        p.quad(grey, [(sx * 0.4, -3.6, 1.72), (sx * 0.4, -2.1, 1.72), (sx * 1.7, -2.1, 1.67), (sx * 1.7, -2.5, 1.67)])
+        p.box(dark, (0.5, 1.8, 0.5), (sx * 0.85, -0.8, 1.45))                # intakes
+        p.cyl(bomb, 0.16, 1.6, (sx * 2.4, 2.2, 1.15), (90, 0, 0), seg=10)     # bombs under the wings
+        p.box(dark, (0.06, 0.6, 0.2), (sx * 2.4, 2.2, 1.32))
+        p.cyl(dark, 0.06, 1.4, (sx * 0.2, -0.2, 0.6), seg=6)                  # landing gear
+        p.cyl(dark, 0.22, 0.14, (sx * 0.2, -0.2, 0.22), (0, 90, 0), seg=10)
+    p.quad(grey, [(0, 2.2, 2.1), (0, 5.2, 4.6), (0, 5.6, 4.6), (0, 5.4, 2.1)])  # fin
+    p.quad(grey, [(0, 2.2, 2.1), (0, 5.4, 2.1), (0, 5.6, 4.6), (0, 5.2, 4.6)])
+    p.cyl(dark, 0.06, 1.4, (0, -3.8, 0.6), seg=6)
+    p.cyl(dark, 0.18, 0.12, (0, -3.8, 0.22), (0, 90, 0), seg=10)
+    p.finish(root)
+    empty("Muzzle", root, (0, -6.8, 1.5))
+    save("jet")
+
+
+def gunship():
+    """The utility helicopter with rocket pods and a door machine gun."""
+    helicopter()
+    root = bpy.data.objects["Helicopter"]
+    metal = mat("heli_metal", "#3a3d38", 0.4, 0.7)
+    dark = mat("heli_dark", "#1c1f1a", 0.5, 0.4)
+    p = Part("Pods", 0.5)
+    for sx in (-1, 1):
+        p.box(metal, (1.2, 0.2, 0.12), (sx * 1.6, -0.4, 1.3))
+        p.cyl(dark, 0.26, 1.5, (sx * 2.1, -0.6, 1.1), (90, 0, 0), seg=10)
+        p.cyl(metal, 0.22, 0.05, (sx * 2.1, -1.36, 1.1), (90, 0, 0), seg=10)
+    p.cyl(dark, 0.04, 1.0, (1.4, -1.6, 1.4), (90, 0, 0), seg=6)             # door gun
+    p.box(dark, (0.12, 0.4, 0.16), (1.4, -1.0, 1.42))
+    p.finish(root)
+    empty("Muzzle", root, (1.4, -2.15, 1.4))
+    save("gunship")
+
+
+def c4_charge():
+    reset()
+    block = mat("c4_block", "#a59d7c", 0.8)
+    tape = mat("c4_tape", "#25282a", 0.6)
+    red = mat("c4_light", "#d02010", 0.3)
+    p = Part("Charge", 8)
+    p.box(block, (0.2, 0.12, 0.06), (0, 0, 0.03))
+    p.box(tape, (0.21, 0.025, 0.065), (0.05, 0, 0.03))
+    p.box(tape, (0.21, 0.025, 0.065), (-0.05, 0, 0.03))
+    p.box(tape, (0.05, 0.04, 0.025), (0, 0, 0.07))
+    p.box(red, (0.012, 0.012, 0.012), (0.015, 0, 0.086))
+    p.finish()
+    save("c4")
+
+
+def smoke_grenade():
+    reset()
+    body = mat("smoke_body", "#4c5a3a", 0.6, 0.3)
+    top = mat("smoke_top", "#d8d6c8", 0.6)
+    metal = mat("grenade_metal", "#8a8a80", 0.4, 0.8)
+    p = Part("Smoke", 8)
+    p.cyl(body, 0.032, 0.11, (0, 0, 0), seg=12)
+    p.cyl(top, 0.033, 0.015, (0, 0, 0.05), seg=12)
+    p.box(metal, (0.01, 0.06, 0.008), (0, 0.02, 0.06), (-30, 0, 0))
+    p.finish()
+    save("smoke_grenade")
+
+
 def save_png(name, arr, folder=None, alpha=False):
     h, w = arr.shape[:2]
     img = bpy.data.images.new(name, w, h, alpha=alpha)
@@ -1507,6 +1604,7 @@ BUILDERS = [
     lambda: fp_weapon("fp_t56", build_t56),
     lambda: fp_weapon("fp_pistol", build_pistol),
     lambda: fp_weapon("fp_svd", build_svd),
+    lambda: weapon_model("wpn_rpg", build_rpg), jet, gunship, c4_charge, smoke_grenade,
     grenade, watchtower, alarm, tree_rain2, fern, banana, fallen_log, hut, foliage_textures,
 ]
 

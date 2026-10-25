@@ -173,6 +173,13 @@ export class Input {
       el.addEventListener('touchstart', (e) => { this.pressed.add(el.dataset.key); el.classList.add('down'); e.preventDefault(); e.stopPropagation(); }, { passive: false });
       el.addEventListener('touchend', (e) => { el.classList.remove('down'); e.preventDefault(); });
     }
+    // held buttons (helicopter up / down) count as a held key
+    for (const el of root.querySelectorAll('[data-hold]')) {
+      el.addEventListener('touchstart', (e) => { this.keys.add(el.dataset.hold); el.classList.add('down'); e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      const up = (e) => { this.keys.delete(el.dataset.hold); el.classList.remove('down'); e.preventDefault(); };
+      el.addEventListener('touchend', up);
+      el.addEventListener('touchcancel', up);
+    }
     hold('.btn-reload', () => this.pressed.add('KeyR'), () => {});
     hold('.btn-action', () => { this.touchAction = true; }, () => { this.touchAction = false; });
     const runBtn = root.querySelector('.btn-sprint');

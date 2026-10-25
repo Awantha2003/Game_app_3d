@@ -84,6 +84,8 @@ export class Audio {
   // gunshot by weapon type; pos = null for the player's own weapon
   weapon(kind, pos = null) {
     if (kind === 'pistol') this.burst({ pos, dur: 0.07, freq: 900, q: 1.2, vol: 0.35, thump: 120 });
+    else if (kind === 'rpg') this.rocket(pos);
+    else if (kind === 'hmg') this.burst({ pos, dur: 0.2, freq: 1500, vol: 0.8, thump: 80 });
     else if (kind === 'svd') this.burst({ pos, dur: 0.5, freq: 2200, vol: pos ? 0.9 : 0.75, thump: 75 });
     else this.shot(pos, !pos);
   }
@@ -107,6 +109,45 @@ export class Audio {
       for (const n of this.sirenOsc) n.stop();
       this.sirenOsc = null;
     }
+  }
+
+  // engine of the vehicle the player is in: kind sets the tone, level 0..1 the revs
+  engine(kind, level) {
+    if (!this.ctx) return;
+    if (!kind) {
+      if (this.eng) { this.eng.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2); const e = this.eng; setTimeout(() => { e.src.stop(); e.o.stop(); }, 800); this.eng = null; }
+      return;
+    }
+    if (!this.eng || this.eng.kind !== kind) {
+      this.engine(null);
+      const ctx = this.ctx, src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), o = ctx.createOscillator(), og = ctx.createGain();
+      src.buffer = this.noise;
+      src.loop = true;
+      f.type = 'lowpass';
+      f.Q.value = 3;
+      o.type = kind === 'heli' ? 'square' : 'sawtooth';
+      og.gain.value = kind === 'jet' ? 0.02 : 0.05;
+      src.connect(f).connect(g).connect(this.master);
+      o.connect(og).connect(g);
+      g.gain.value = 0;
+      src.start();
+      o.start();
+      this.eng = { kind, src, f, g, o };
+    }
+    const e = this.eng, t = this.ctx.currentTime;
+    const base = { buffel: [55, 260], boat: [70, 420], heli: [14, 300], jet: [120, 2600] }[kind];
+    e.o.frequency.setTargetAtTime(base[0] * (1 + level * 1.4), t, 0.1);
+    e.f.frequency.setTargetAtTime(base[1] * (1 + level * 1.6), t, 0.1);
+    e.g.gain.setTargetAtTime(0.1 + level * 0.12, t, 0.15);
+  }
+
+  rocket(pos = null) {
+    this.burst({ pos, dur: 0.7, freq: 900, vol: 0.8, thump: 90, attack: 0.01 });
+  }
+
+  // a jet passing overhead
+  flyby(pos) {
+    this.burst({ pos, dur: 2.6, freq: 1400, q: 0.5, vol: 1.4, attack: 0.9 });
   }
 
   explosion(pos) {

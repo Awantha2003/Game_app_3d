@@ -11,7 +11,8 @@
     "test:campaign": "node tests/campaign.mjs",
     "test:coop": "node tests/coop.mjs",
     "test:systems": "node tests/systems.mjs",
-    "test:mobile": "node tests/mobile.mjs"
+    "test:mobile": "node tests/mobile.mjs",
+    "test:vehicles": "node tests/vehicles.mjs"
   },
   "repository": {
     "type": "git",

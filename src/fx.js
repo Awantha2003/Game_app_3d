@@ -87,6 +87,19 @@ export class FX {
     this.lightTime = 0.25;
   }
 
+  // thick smoke from a smoke grenade or a vehicle's dischargers (lasts `life` seconds)
+  smokeCloud(pos, life = 22) {
+    for (let i = 0; i < 14; i++) {
+      const p = pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 5, 0.6 + Math.random() * 2.5, (Math.random() - 0.5) * 5));
+      this.sprite(this.smokeTex, p, 4 + Math.random() * 2, life * (0.7 + Math.random() * 0.3), { color: 0xd8d8d0, grow: 0.9, rise: 0.08 });
+    }
+  }
+
+  // puff behind a rocket in flight
+  trail(pos) {
+    this.sprite(this.smokeTex, pos, 0.45, 0.9, { color: 0xbab4aa, grow: 2.5, rise: 0.3 });
+  }
+
   update(dt) {
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i];

@@ -42,7 +42,16 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
 - **Stealth AI:** LTTE cadres patrol or guard their posts. Each one has a field of view and a detection meter, shown as arcs around your crosshair. When they notice something they become suspicious, then search, then fight. They also hear gunshots and running footsteps. A HUD tag shows HIDDEN, SUSPICIOUS, SPOTTED or ALARM.
 - **Alarms:** an alerted cadre runs for the camp siren. If he reaches it, reinforcements arrive. You can sabotage an alarm by holding E. Thoppigala has an alarm objective.
 - **Watchtowers:** sentries with long sightlines. You can climb a tower yourself with E.
-- **Weapons:** 1 is the T-56. 2 is a suppressed pistol, heard only about 9 m away. 3 is the SVD with a scope; it sways, and holding Shift holds your breath to steady it. G throws a grenade.
+- **Weapons:** 1 is the T-56. 2 is a suppressed pistol, heard only about 9 m away. 3 is the SVD with a scope; it sways, and holding Shift holds your breath to steady it. The scope zooms 4×, 8× or 12× with the mouse wheel, + / −, or ZOOM + / − on a phone (binoculars zoom 4× or 8×). 4 is an RPG-7 launcher with one rocket loaded and four spare. A weapon bar at the bottom of the screen shows the four slots; tap or click a slot to change weapon.
+- **Explosives:** Y switches between frag grenades, smoke grenades and C4 charges, and G throws or places the selected one (⇄ BOMB and GREN on a phone). Smoke blocks sight lines for both sides for about 25 seconds. C4 is placed at your feet and set off with U (DET on a phone) from a safe distance. A supply crate tops up all three.
+- **Vehicles:** every mission has a motor pool beside the start: a Buffel APC, a Bell 212 gunship and a ground-attack jet (not on the Elephant Pass causeway), plus a Navy Arrow boat on missions with open water. Walk up and press F (or hold E) to board, and again to get out.
+  - **Buffel:** W/S drive, A/D steer, the mouse aims the 12.7 mm roof gun, G fires smoke dischargers. The section climbs in with you and gets out where you stop.
+  - **Gunship:** the rotor spins up first. Space climbs, C descends (UP / DOWN on a phone), WASD flies, the mouse turns and aims the door gun, G fires the rocket pods. You can only get out once landed.
+  - **Jet:** W to take off; it climbs away by itself, then steers where you look (A/D roll). The cannon fires with the mouse button and G drops bombs. It cannot land on this ground: get out (F) to fly it back to its strip, refuelled and re-armed. Too low and it crashes; too far away and it turns back.
+  - **Boat:** stays on the water. W/S throttle, A/D steer, bow machine gun. You can get out at the shore.
+  - Vehicle guns heat up instead of running out of ammunition. Enemy fire hits the hull (armour reduces bullet damage), RPG cadres aim at vehicles, and a destroyed vehicle throws you out hurt.
+- **Radio support (L, or CALL on a phone):** reinforcements (a fire team of three, twice per mission), an artillery barrage (six shells), an air strike (a jet drops four bombs in a line) and a supply drop (a helicopter drops a crate beside you). Strikes go where your crosshair points, or on a target marked on the map with "Orders: strike target". They are refused near civilians or your own soldiers.
+- **Wounded soldiers:** a badly hit squadmate goes down instead of fighting on. Cadres stop shooting at him; the medic runs to him first, or you can hold E next to him to patch him up. Reinforcements can be killed. Your own rounds and grenades wound your squad too ("Check your fire").
 - **Binoculars (B):** look at a hostile to mark him on the HUD and the map.
 - **Tactical map (M):** shows the terrain, buildings, towers, alarms, supplies, your squad and marked hostiles.
 - **Squad orders:** T makes the squad follow or hold. V sends Bravo team to the point you are aiming at, so the team can split and flank. X sets weapons free or tight. While weapons are tight, allies fire only once the enemy is alerted. They copy your stance so they don't give you away. Kasun is a marksman in a ghillie suit.
@@ -51,9 +60,9 @@ You play **Awan**, a fictional officer who starts as a Second Lieutenant. He lea
   - **Nimal, the support gunner,** carries a machine gun. His long bursts suppress cadres, and so do your own rounds landing close to them. A suppressed cadre ducks and fires far less accurately.
   - **Cover and flanking:** in a fight, cadres and your section look for a spot behind sandbags, bunkers, rocks, trees or buildings that blocks the enemy's line of sight. They crouch there and rise to shoot. Some cadres work round the side, and a squadmate calls it out ("They're flanking — left side!").
 - **Jump and crawl:** Space jumps when you are standing, and stands you up when you are crouched or prone. Z goes prone so you can crawl.
-- **Enemy weapons:** a fallen cadre drops his weapon. Most carry T-56 rifles, sentries carry SVDs, and some carry machine guns. Walk up and hold E (or tap E) to take it: the same weapon gives you its ammunition, and a different one swaps into its slot (rifle or machine gun as primary, SVD as marksman rifle) while your old weapon is dropped. Q cycles weapons.
+- **Enemy weapons:** a fallen cadre drops his weapon. Most carry T-56 rifles, sentries carry SVDs, some carry machine guns and a few carry RPG launchers. Walk up and hold E (or tap E) to take it: the same weapon gives you its ammunition, and a different one swaps into its slot (rifle or machine gun as primary, SVD as marksman rifle) while your old weapon is dropped. Q cycles weapons.
 - **Planning on the map:** open the map (M or the MAP button). Tap or click any spot to send Bravo team there, or switch the order to the whole section. Planned moves are drawn on the map. On a desktop the mouse is freed while the map is open.
-- **Phones:** a visible MOVE joystick that follows your thumb. Pushing it all the way forward runs, and also lowers an aimed weapon. RUN toggles running. On-screen buttons for jump, crouch, prone, map, weapon, grenade, binoculars, squad, medic and night vision, plus move, look, fire, aim (toggle), reload, interact and run. In portrait the camera pulls back with a wider field of view and the HUD is compacted. A hint suggests turning the phone sideways, which still gives the best view.
+- **Phones:** a visible MOVE joystick that follows your thumb. Pushing it all the way forward runs, and also lowers an aimed weapon. RUN toggles running. On-screen buttons for jump, crouch, prone, map, weapon, grenade, bomb type, detonate, radio support (CALL), binoculars, squad, medic and night vision (and UP / DOWN in the gunship, ZOOM + / − in the scope), plus move, look, fire, aim (toggle), reload, interact and run. In portrait the camera pulls back with a wider field of view and the HUD is compacted. A hint suggests turning the phone sideways, which still gives the best view.
 - **Loadout:** choose your gear from the menu or the briefing. Some items unlock by rank:
   - **Primary weapon:** T-56 rifle, or a light machine gun with a 100-round belt (Lieutenant). The machine gun makes you slower and takes longer to reload.
   - **Equipment:** three grenades, extra magazines (+50% ammunition, Lieutenant), or a pouch of five grenades (Captain).
@@ -75,6 +84,7 @@ Choose **Co-op** in the main menu, type your name, then **Host a game**. Send th
   - **Server 1** (default): Trystero over several public Nostr relays at once, so it does not depend on any single server.
   - **Server 2**: the PeerJS public server, retried automatically on network errors.
   - If one doesn't connect, the host can switch to the other and send a new link. After that, game traffic goes directly between the browsers (WebRTC).
+- **Vehicles and support in co-op:** whoever is at the controls moves the vehicle; everyone sees it with them inside, and the host keeps its hull points. A friend's radio call is carried out by the host.
 - **Limitations:** there is no relay (TURN) server, so some strict corporate or mobile networks can still block the direct connection. The host's page must stay open. Insertion cinematics are skipped in co-op.
 
 ## Environment and presentation
@@ -119,13 +129,20 @@ npm run test:campaign -- 0 3      # only missions 1 and 4
 - text chat and voice (a fake microphone)
 - the mission start for everyone, and unit and position sync between all players
 - hits, objective progress, mission completion and XP for the friends
+- a friend driving the Buffel, and a friend's call for reinforcements
 - a player leaving
 
 `npm run build && npm run test:mobile` checks phone controls in portrait: the joystick is visible, aiming the T-56 does not show the sniper scope, and the joystick walks and runs.
 
+`npm run build && npm run test:vehicles` checks the four weapon slots, the scope zoom, the RPG, smoke, C4, a squadmate going down and being patched up, friendly fire, boarding, driving and firing from the Buffel (the section mounts up), the hull taking enemy fire, the gunship (climb, fly, rockets, landing), the jet (take-off, bomb, return to base), reinforcements, artillery, a refused strike, the supply drop and the boat.
+
 `npm run build && npm run test:systems` checks the medic, natural healing to 60%, suppression, the gunner's machine gun, cover search, rank-locked loadout items, the machine gun and grenade pouch, night vision and the loadout screen.
 
 The campaign test checks the start screen, prologue skip, every menu screen, each mission's completion, debrief XP, the promotions, the epilogue, saving across a reload, and that there are no page errors.
+
+## Android app (Expo)
+
+[`mobile/`](mobile/README.md) is an Expo app that opens the game full screen and asks for the microphone only when you turn on co-op voice chat. EAS Build turns it into an Android APK you can download and install; see [mobile/README.md](mobile/README.md).
 
 ## Two versions
 
@@ -192,6 +209,9 @@ src/weather.js            rain, mist, dust, smoke and lightning
 src/postfx.js             MSAA, bloom, tone mapping and colour grade
 src/net.js                co-op for up to 4 players: Trystero/PeerJS links, chat, voice
 src/units.js              soldiers and civilians: animation and AI
+src/vehicles.js           Buffel, gunship, jet and boat: driving, flying, hulls, co-op poses
+src/support.js            radio support: reinforcements, artillery, air strike, supply drop
+mobile/                   Android app (Expo): the game in a full-screen WebView
 src/fx.js, src/audio.js   effects and procedural sound
 src/input.js              keyboard, mouse and touch controls
 ```

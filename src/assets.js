@@ -10,6 +10,7 @@ export const MODEL_NAMES = [
   'tree_jungle', 'bush', 'rock_outcrop', 'rock_small', 'supplies', 'sandbag_wall',
   'watchtower', 'alarm', 'soldier_sf', 'soldier_ghillie', 'wpn_svd', 'wpn_pistol', 'helicopter', 'arrow_boat', 'grenade',
   'tree_rain2', 'fern', 'banana', 'fallen_log', 'hut', 'wpn_lmg', 'artillery', 'wpn_t56',
+  'wpn_rpg', 'jet', 'gunship', 'c4', 'smoke_grenade',
 ];
 
 const TEXTURE_NAMES = [

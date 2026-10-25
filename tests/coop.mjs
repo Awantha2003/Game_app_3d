@@ -113,6 +113,27 @@ try {
   const names = await g2.evaluate(() => [...window.__game.partners.values()].map((u) => u.name).sort().join(', '));
   check(names === 'Awantha, Kasun', `soldiers carry the players' names (${names})`);
 
+  // Kasun drives the Buffel: everyone sees it move with him inside
+  await g1.evaluate(() => {
+    const g = window.__game, v = g.vehicles.find((x) => x.type === 'buffel');
+    g.player.pos.copy(v.pos);
+    g.enterVehicle(v);
+    g.input.keys.add('KeyW');
+  });
+  await wait(2500);
+  await g1.evaluate(() => window.__game.input.keys.delete('KeyW'));
+  await wait(1500);
+  const apc = await g1.evaluate(() => window.__game.vehicle?.pos.toArray());
+  const apcHost = await host.evaluate(() => { const g = window.__game, v = g.vehicles.find((x) => x.type === 'buffel'); return { p: v.pos.toArray(), d: v.driverNid, hidden: !g.partners.get(v.driverNid)?.obj.visible }; });
+  const apcG2 = await g2.evaluate(() => window.__game.vehicles.find((x) => x.type === 'buffel').pos.toArray());
+  const dv = apc ? Math.hypot(apc[0] - apcHost.p[0], apc[2] - apcHost.p[2]) : 99, dv2 = apc ? Math.hypot(apc[0] - apcG2[0], apc[2] - apcG2[2]) : 99;
+  check(dv < 2 && dv2 < 2 && apcHost.hidden, `Kasun drives the Buffel and the others see it (${dv.toFixed(2)} m / ${dv2.toFixed(2)} m, driver ${apcHost.d})`);
+  await g1.evaluate(() => window.__game.exitVehicle(true));
+  // Nimal radios for reinforcements: the host sends them, everyone sees them
+  const allies0 = await g2.evaluate(() => window.__game.units.filter((u) => u.team === 'army' && !u.isPlayer && !u.remote).length);
+  await g2.evaluate(() => window.__game.support.call('reinforce'));
+  check(await until(g2, (n) => window.__game.units.filter((u) => u.team === 'army' && !u.isPlayer && !u.remote).length >= n + 3, allies0, 10000), 'a friend\'s call for reinforcements reaches everyone');
+
   const target = await host.evaluate(() => window.__game.units.find((x) => x.team === 'ltte' && x.alive).nid);
   await g1.evaluate((nid) => window.__game.net.send({ t: 'hit', nid, dmg: 500, aimed: false }), target);
   check(await until(g2, (nid) => !window.__game.units.find((x) => x.nid === nid)?.alive, target, 6000), 'Kasun\'s hit kills a cadre for everyone');

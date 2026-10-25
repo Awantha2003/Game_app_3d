@@ -90,6 +90,8 @@ export class Unit {
 
   // smaller target when crouched, prone or hiding
   get bodyHeight() {
+    if (this.vehicle) return 1.5;
+    if (this.downed) return 0.45;
     if (this.team === 'civ' && this.state === 'wait') return 1.0;
     return this.stance === 'prone' ? 0.45 : this.stance === 'crouch' ? 1.0 : 1.48;
   }
@@ -104,6 +106,7 @@ export class Unit {
 
   // how visible this soldier is to an observer (stance, movement, vegetation)
   get exposure() {
+    if (this.vehicle) return this.vehicle.kind === 'jet' && this.vehicle.airborne ? 0.6 : 1.8;
     let e = this.stance === 'prone' ? 0.3 : this.stance === 'crouch' ? 0.6 : 1;
     const s = this.speed || 0;
     if (s > 5) e *= 1.4;
@@ -125,9 +128,21 @@ export class Unit {
     if (!this.alive) return;
     if (this.remote) { this.game.net?.sendTo(this.nid, { t: 'dmg', v: Math.round(amount) }); this.lastHurt = this.game.time; return; }
     if (this.team === 'army' && !this.isPlayer) {
-      // allies are wounded but never killed, so the squad stays with the player
-      this.hp = Math.max(25, this.hp - amount);
+      // soldiers of the section go down when badly hit and must be patched
+      // up by the medic or the player; reinforcements can be killed
       this.underFire = 6;
+      if (this.downed) return;
+      this.hp -= amount;
+      if (this.hp <= 0 && !this.reinforcement) {
+        this.hp = 0;
+        this.downed = true;
+        this.stance = 'prone';
+        this.speed = 0;
+        this.patient = null;
+        this.treating = false;
+        this.game.onAllyDown?.(this);
+        return;
+      }
     } else {
       this.hp -= amount;
     }
@@ -321,6 +336,8 @@ export class Unit {
     if (this.remote) { this.netSync(dt); return; }
     if (!this.alive) { this.sync(dt); return; }
     if (this.isPlayer) return;
+    if (this.vehicle) return; // the vehicle carries this soldier
+    if (this.downed) { this.speed = 0; this.stance = 'prone'; this.pitch = -1.2; this.sync(dt); return; }
     if (this.team === 'civ') this.updateCivilian(dt);
     else this.updateSoldier(dt);
     this.sync(dt);
@@ -368,7 +385,8 @@ export class Unit {
   }
 
   hostiles() {
-    return this.game.units.filter((u) => u.alive && u.team !== 'civ' && u.team !== this.team);
+    // soldiers riding inside a vehicle and the wounded on the ground are not targets
+    return this.game.units.filter((u) => u.alive && u.team !== 'civ' && u.team !== this.team && !u.downed && !(u.vehicle && !u.isPlayer && !u.remote));
   }
 
   canSee(u, range) {
@@ -376,6 +394,7 @@ export class Unit {
     if (d > range) return false;
     const a = this.eye.clone();
     _v.set(u.pos.x, u.pos.y + Math.min(1.3, u.bodyHeight - 0.15), u.pos.z);
+    if (this.game.world.smokes.length && this.game.world.smokeBlocks(a, _v)) return false;
     return this.game.world.lineOfSight(a, _v);
   }
 
@@ -613,10 +632,10 @@ export class Unit {
     const g = this.game;
     if (this.kits <= 0) return false;
     let pat = this.patient;
-    const needs = (u) => u.alive && u.team === 'army' && u !== this && u.tag !== 'linkup'
+    const needs = (u) => u.alive && u.team === 'army' && u !== this && u.tag !== 'linkup' && !u.vehicle
       && u.hp < (u.isPlayer ? (g.medicCalled ? 97 : 60) : u.maxHp * 0.55) && u.pos.distanceTo(this.pos) < 50;
     if (!pat || !needs(pat) && !this.treating) {
-      const list = g.units.filter(needs).sort((a, b) => (b.isPlayer - a.isPlayer) || a.hp / a.maxHp - b.hp / b.maxHp);
+      const list = g.units.filter(needs).sort((a, b) => (!!b.downed - !!a.downed) || (b.isPlayer - a.isPlayer) || a.hp / a.maxHp - b.hp / b.maxHp);
       pat = list[0] || null;
       if (pat && pat !== this.patient) g.onMedic?.(this, pat, 'coming');
       this.patient = pat;
@@ -636,6 +655,7 @@ export class Unit {
     this.stance = 'crouch';
     this.move(0, 0, 0, dt);
     pat.hp = Math.min(pat.maxHp, pat.hp + (pat.isPlayer ? 16 : 40) * dt);
+    if (pat.downed && pat.hp >= pat.maxHp * 0.4) { pat.downed = false; pat.stance = 'crouch'; g.onAllyRevived?.(pat, this); }
     if (pat.hp >= pat.maxHp * 0.98) {
       this.kits--;
       this.treating = false;
@@ -673,6 +693,7 @@ export class Unit {
     const marksman = this.role === 'marksman';
     this.fireTimer -= dt;
     if (this.fireTimer > 0) return;
+    if (this.weaponId === 'rpg') { this.fireRocket(tgt, dist); return; }
     const gunner = this.role === 'gunner';
     if (this.burst <= 0) this.burst = marksman || this.sentry ? 1 : gunner ? 7 + Math.floor(Math.random() * 6) : 2 + Math.floor(Math.random() * 4);
     this.burst--;
@@ -704,7 +725,10 @@ export class Unit {
     if (this.team === 'army') g.suppress?.(end, gunner ? 4.5 : 2.5, gunner ? 3 : 1.5);
     g.fx.muzzle(from);
     g.audio.shot(from, false);
-    if (res?.kind === 'unit') {
+    if (res?.kind === 'vehicle') {
+      res.vehicle.damage(this.team === 'army' ? 26 : 9 + Math.random() * 6, this);
+      g.fx.impact(res.point, 'prop');
+    } else if (res?.kind === 'unit') {
       if (res.unit.team === 'civ') return; // soldiers on both sides hold fire on civilians in this game
       if (res.unit.team === this.team) return; // no friendly fire from AI soldiers
       const dmg = this.team === 'army' ? (marksman ? 90 : 26) : 7 + Math.random() * 6;
@@ -714,5 +738,21 @@ export class Unit {
       g.fx.impact(res.point, res.kind);
     }
     if (tgt.isPlayer && !hit && from.distanceTo(tgt.pos) < 60) g.audio.whiz();
+  }
+
+  // a cadre with an RPG: slow to reload, most dangerous to vehicles
+  fireRocket(tgt, dist) {
+    const g = this.game;
+    this.fireTimer = 7 + Math.random() * 5;
+    if (dist > 110) return;
+    const from = this.muzzleWorld(new THREE.Vector3());
+    const aim = tgt.vehicle ? tgt.vehicle.centre.clone() : new THREE.Vector3(tgt.pos.x, tgt.pos.y + 0.8, tgt.pos.z);
+    const miss = (tgt.vehicle ? 1.5 : 4) * (0.4 + dist / 60) / Math.max(0.5, g.difficulty);
+    aim.x += (Math.random() - 0.5) * miss;
+    aim.y += (Math.random() - 0.5) * miss * 0.4;
+    aim.z += (Math.random() - 0.5) * miss;
+    g.fireRocket?.(from, aim.sub(from).normalize(), this, { speed: 55, r: 4.5, dmg: 200 });
+    g.fx.muzzle(from);
+    g.audio.weapon('rpg', from);
   }
 }
