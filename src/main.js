@@ -1323,10 +1323,14 @@ class Game {
 
     this.fireCooldown -= dt;
     this.bloom = Math.max(0, this.bloom - dt * 0.12);
-    const pull = inp.fire && (W.auto || !this.wasFiring);
+    // a quick tap fires even when it is shorter than a frame, and a tap during
+    // the bolt cycle (SVD, pistol) fires as soon as the weapon is ready
+    if (inp.consumeFireTap()) this.fireQueued = 0.5;
+    this.fireQueued = Math.max(0, (this.fireQueued || 0) - dt);
+    const pull = (inp.fire && (W.auto || !this.wasFiring)) || this.fireQueued > 0;
     this.wasFiring = inp.fire;
     if (pull && !sprint && !this.binos && this.reloading <= 0 && this.fireCooldown <= 0) {
-      if (this.ammo > 0) this.shoot();
+      if (this.ammo > 0) { this.shoot(); this.fireQueued = 0; }
       else if (this.reserve <= 0) { this.audio.click(); this.fireCooldown = 0.3; }
     }
     if (this.binos) this.markWithBinoculars();
@@ -1589,6 +1593,7 @@ class Game {
     this.yaw -= look.x * sens;
     this.pitch = THREE.MathUtils.clamp(this.pitch - look.y * sens, -1.2, 0.9);
     inp.consumeWheel();
+    inp.consumeFireTap();
     const mv = inp.moveVec;
     v.drive(dt, {
       throttle: mv.y, steer: mv.x, up: inp.keys.has('Space'), down: inp.keys.has('KeyC') || inp.keys.has('ControlLeft'),

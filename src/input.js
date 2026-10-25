@@ -28,7 +28,7 @@ export class Input {
     canvas.addEventListener('mousedown', (e) => {
       if (this.touch) return;
       if (document.pointerLockElement !== canvas) { this.requestLock(); return; }
-      if (e.button === 0) this.fire = true;
+      if (e.button === 0) { this.fire = true; this.fireTap = true; }
       if (e.button === 2) this.aim = true;
     });
     window.addEventListener('mouseup', (e) => {
@@ -65,6 +65,13 @@ export class Input {
 
   endFrame() {
     this.pressed.clear();
+  }
+
+  // a click or tap on fire since the last call, even one too short to last a frame
+  consumeFireTap() {
+    const t = this.fireTap;
+    this.fireTap = false;
+    return t;
   }
 
   consumeWheel() {
@@ -164,7 +171,7 @@ export class Input {
       el.addEventListener('touchstart', (e) => { on(); el.classList.add('down'); e.preventDefault(); e.stopPropagation(); }, { passive: false });
       el.addEventListener('touchend', (e) => { off(); el.classList.remove('down'); e.preventDefault(); });
     };
-    hold('.btn-fire', () => { this.fire = true; }, () => { this.fire = false; });
+    hold('.btn-fire', () => { this.fire = true; this.fireTap = true; }, () => { this.fire = false; });
     const aimBtn = root.querySelector('.btn-aim');
     this.aimBtn = aimBtn;
     hold('.btn-aim', () => { this.aim = !this.aim; aimBtn.classList.toggle('on', this.aim); }, () => {});

@@ -1,4 +1,5 @@
-// Phone controls in portrait: the scope overlay, the joystick and running.
+// Phone controls in portrait: the scope overlay, the joystick, running and
+// firing the SVD through the scope.
 //
 //   npm run build && npm run test:mobile [-- screenshot-dir]
 
@@ -47,6 +48,18 @@ try {
     out.ran = g.player.pos.distanceTo(p1);
     out.aimAfterPush = g.input.aim;
     fire(zone, 'touchend', 7, 80, 600);
+    // SVD: aim, then two quick taps on FIRE (each shorter than a frame, the
+    // second during the bolt cycle): both shots go off and the scope stays up
+    g.switchWeapon(2);
+    if (!g.input.aim) { fire(aim, 'touchstart', 9, 1, 1); fire(aim, 'touchend', 9, 1, 1); }
+    step(15);
+    const fb = document.querySelector('.btn-fire'), a0 = g.ammo;
+    fire(fb, 'touchstart', 11, 1, 1); fire(fb, 'touchend', 11, 1, 1);
+    step(2);
+    fire(fb, 'touchstart', 12, 1, 1); fire(fb, 'touchend', 12, 1, 1);
+    step(20);
+    out.scopeShots = a0 - g.ammo;
+    out.stillScoped = g.isScoped();
     g.postfx.render(0.03);
     return out;
   });
@@ -54,6 +67,7 @@ try {
   check(r.aimOn && r.scope === 'none', `aiming the T-56 does not show the sniper scope (display ${r.scope})`);
   check(r.walked > 0.8, `half a push on the joystick walks (${r.walked.toFixed(1)} m in 1 s)`);
   check(r.ran > 5 && !r.aimAfterPush, `a full push lowers the weapon and runs (${r.ran.toFixed(1)} m in 1 s)`);
+  check(r.scopeShots === 2 && r.stillScoped, `quick taps on FIRE shoot the SVD while zoomed (${r.scopeShots} shots, scope ${r.stillScoped ? 'still up' : 'dropped'})`);
   if (shots) { await page.waitForTimeout(2500); await page.screenshot({ path: `${shots}/mobile_stick.png`, timeout: 300000 }); }
   check(errors.length === 0, `no page errors${errors.length ? `: ${errors.join(' | ')}` : ''}`);
 } catch (e) {
